@@ -1,0 +1,7 @@
+# Demo mod: insulated huts. Bigger, house more settlers, painted blue.
+id = "frost_huts"
+name = "Insulated huts"
+version = "1.0.0"
+game = "steading"
+schema = 1
+layers = ["frost_huts.usda"]
