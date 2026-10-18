@@ -10,6 +10,9 @@ endif()
 
 option(STEADING_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(STEADING_BUILD_TESTS "Build the test suite" ON)
+option(STEADING_WITH_STRATA "Build the playable game and save integration on the Strata engine (needs OpenUSD)" OFF)
+# The Strata commit the game is built against. Pinned; bump deliberately.
+set(STEADING_STRATA_REF "f3e44a2e23666c96d7acf458a84c1b4af70aa312" CACHE STRING "Strata git ref (a full commit SHA in CI)")
 
 function(steading_warnings target)
   if(MSVC)
@@ -59,4 +62,38 @@ if(STEADING_BUILD_TESTS)
     steading_warnings(test_${t})
     add_test(NAME ${t} COMMAND test_${t})
   endforeach()
+endif()
+
+# ---------------------------------------------------------------- the game on Strata
+# Needs OpenUSD: pass -DCMAKE_PREFIX_PATH=<openusd install>. Strata is fetched at
+# STEADING_STRATA_REF (or taken from -DFETCHCONTENT_SOURCE_DIR_STRATA=<checkout>).
+if(STEADING_WITH_STRATA)
+  cmake_minimum_required(VERSION 3.24)
+  include(FetchContent)
+  set(STRATA_WITH_USD ON CACHE BOOL "" FORCE)
+  set(STRATA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(STRATA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+  FetchContent_Declare(strata
+    GIT_REPOSITORY https://github.com/Preponderous-Software/strata.git
+    GIT_TAG ${STEADING_STRATA_REF})
+  FetchContent_MakeAvailable(strata)
+
+  add_library(steading_bridge STATIC src/bridge/bridge.cpp src/bridge/session.cpp)
+  target_include_directories(steading_bridge PUBLIC src)
+  target_link_libraries(steading_bridge PUBLIC steading_colony steading_mods strata::save)
+  steading_warnings(steading_bridge)
+  target_compile_options(steading_bridge PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-conversion>)
+
+  add_executable(steading app/main.cpp app/scene.cpp)
+  target_link_libraries(steading PRIVATE steading_bridge strata::static)
+  target_compile_definitions(steading PRIVATE STEADING_GAME_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+  steading_warnings(steading)
+
+  if(STEADING_BUILD_TESTS)
+    add_executable(test_saves tests/test_saves.cpp)
+    target_link_libraries(test_saves PRIVATE steading_bridge)
+    target_compile_definitions(test_saves PRIVATE STEADING_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    steading_warnings(test_saves)
+    add_test(NAME saves COMMAND test_saves "${CMAKE_CURRENT_BINARY_DIR}/save-test-out")
+  endif()
 endif()

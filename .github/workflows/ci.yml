@@ -52,3 +52,74 @@ jobs:
           bin=build/steading-sim; [ -f build/Release/steading-sim.exe ] && bin=build/Release/steading-sim.exe
           "$bin" --ticks 1000
           "$bin" --settlers 1000 --max 1000 --size 160 --ticks 300
+
+  game:
+    # The playable game on Strata, with saves through Strata's save core. OpenUSD
+    # is never built here: the prebuilt install Strata's CI publishes for its
+    # pinned OpenUSD (a release asset of the strata repository, keyed by
+    # Strata's modules/usd/openusd lock) is downloaded and cached.
+    name: game on Strata (saves soak, headless smoke)
+    runs-on: ubuntu-latest
+    container: ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
+    env:
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      GALLIUM_DRIVER: llvmpipe
+      __EGL_VENDOR_LIBRARY_FILENAMES: /usr/share/glvnd/egl_vendor.d/50_mesa.json
+    steps:
+      - name: Install toolchain, SDL3 build dependencies and Mesa
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git curl python3 build-essential cmake zstd pkg-config \
+            libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev libxss-dev \
+            libegl1 libegl-mesa0 libgl1-mesa-dri libgl1
+
+      - uses: actions/checkout@v4
+
+      - name: Check out the pinned Strata
+        run: |
+          ref="$(tr -d '[:space:]' < strata.ref)"
+          git init -q "$RUNNER_TEMP/strata"
+          git -C "$RUNNER_TEMP/strata" fetch -q --depth 1 https://github.com/Preponderous-Software/strata.git "$ref"
+          git -C "$RUNNER_TEMP/strata" checkout -q FETCH_HEAD
+          echo "STRATA_DIR=$RUNNER_TEMP/strata" >> "$GITHUB_ENV"
+          echo "OPENUSD_KEY=$(bash "$RUNNER_TEMP/strata/modules/usd/openusd/key.sh")" >> "$GITHUB_ENV"
+
+      - name: Restore the OpenUSD prebuilt
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: openusd-dist
+          key: ${{ env.OPENUSD_KEY }}
+
+      - name: Download the OpenUSD prebuilt
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p openusd-dist
+          curl -fsSL -o "openusd-dist/${OPENUSD_KEY}.tar.gz" \
+            "https://github.com/Preponderous-Software/strata/releases/download/${OPENUSD_KEY}/${OPENUSD_KEY}.tar.gz"
+
+      - name: Configure
+        run: |
+          mkdir -p /opt/openusd && tar -C /opt/openusd -xzf "openusd-dist/${OPENUSD_KEY}.tar.gz"
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSTEADING_WARNINGS_AS_ERRORS=ON \
+            -DSTEADING_WITH_STRATA=ON -DFETCHCONTENT_SOURCE_DIR_STRATA="$STRATA_DIR" \
+            -DCMAKE_PREFIX_PATH="/opt/openusd/${OPENUSD_KEY}" -Wno-dev
+
+      - name: Build
+        run: cmake --build build -j "$(nproc)"
+
+      - name: Test (rules and saves through Strata)
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Headless smoke (EGL + llvmpipe)
+        run: |
+          build/steading --slot "$RUNNER_TEMP/slot" --new 42 --headless --ticks 400 --screenshot steading-400.png
+          build/steading --slot "$RUNNER_TEMP/slot" --headless --ticks 100 --screenshot steading-500.png
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: steading-screenshots
+          path: steading-*.png
+          if-no-files-found: ignore
