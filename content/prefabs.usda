@@ -1,0 +1,88 @@
+#usda 1.0
+(
+    doc = "steading core content: the prefab library. Entities reference these prims; mods override them."
+    upAxis = "Z"
+    metersPerUnit = 1
+)
+
+def Scope "Prefabs"
+{
+    def Xform "Settler"
+    {
+        double colony:stats:speed = 1
+        def Sphere "Geom"
+        {
+            double radius = 0.3
+            float3 xformOp:translate = (0, 0, 0.3)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+            color3f[] primvars:displayColor = [(0.95, 0.75, 0.55)]
+        }
+    }
+
+    def Xform "Hut"
+    {
+        double colony:stats:woodCost = 20
+        double colony:stats:capacity = 4
+        def Cube "Geom"
+        {
+            double size = 0.85
+            float3 xformOp:translate = (0, 0, 0.42)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+            color3f[] primvars:displayColor = [(0.55, 0.35, 0.2)]
+        }
+    }
+
+    def Xform "HutPlan"
+    {
+        def Cube "Geom"
+        {
+            double size = 0.85
+            float3 xformOp:translate = (0, 0, 0.05)
+            float3 xformOp:scale = (1, 1, 0.1)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            color3f[] primvars:displayColor = [(0.8, 0.7, 0.55)]
+        }
+    }
+
+    def Xform "Stockpile"
+    {
+        def Cube "Geom"
+        {
+            double size = 1
+            float3 xformOp:translate = (0, 0, 0.1)
+            float3 xformOp:scale = (1, 1, 0.2)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            color3f[] primvars:displayColor = [(0.9, 0.8, 0.2)]
+        }
+    }
+
+    def Xform "Tree" (
+        variants = {
+            string season = "summer"
+        }
+        prepend variantSets = "season"
+    )
+    {
+        def Cone "Geom"
+        {
+            double radius = 0.35
+            double height = 1
+            uniform token axis = "Z"
+            float3 xformOp:translate = (0, 0, 0.5)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+            color3f[] primvars:displayColor = [(0.1, 0.45, 0.12)]
+        }
+        variantSet "season" = {
+            "summer" {
+                double colony:stats:regrowPerMille = 40
+            }
+            "winter" {
+                double colony:stats:regrowPerMille = 0
+                over "Geom"
+                {
+                    color3f[] primvars:displayColor = [(0.85, 0.9, 0.95)]
+                }
+            }
+        }
+    }
+}

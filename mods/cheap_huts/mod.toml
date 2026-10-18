@@ -1,0 +1,7 @@
+# Demo mod: huts cost less wood but house fewer settlers.
+id = "cheap_huts"
+name = "Cheap huts"
+version = "1.0.0"
+game = "steading"
+schema = 1
+layers = ["cheap_huts.usda"]

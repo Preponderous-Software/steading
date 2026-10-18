@@ -1,0 +1,13 @@
+#usda 1.0
+(
+    doc = "Demo mod: cheap huts. Cost less wood, house fewer settlers than insulated huts."
+)
+
+over "Prefabs"
+{
+    over "Hut"
+    {
+        double colony:stats:woodCost = 10
+        double colony:stats:capacity = 6
+    }
+}

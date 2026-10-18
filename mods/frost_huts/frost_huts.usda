@@ -1,0 +1,17 @@
+#usda 1.0
+(
+    doc = "Demo mod: insulated huts. Bigger, house more settlers, painted blue."
+)
+
+over "Prefabs"
+{
+    over "Hut"
+    {
+        double colony:stats:capacity = 8
+        over "Geom"
+        {
+            double size = 0.95
+            color3f[] primvars:displayColor = [(0.25, 0.45, 0.95)]
+        }
+    }
+}
