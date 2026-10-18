@@ -35,9 +35,13 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
+          FLAGS: ${{ matrix.flags }}
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSTEADING_WARNINGS_AS_ERRORS=ON \
-            -DCMAKE_CXX_FLAGS="${{ matrix.flags }}" -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.flags }}"
+          args=(-DCMAKE_BUILD_TYPE=Release -DSTEADING_WARNINGS_AS_ERRORS=ON)
+          # Only override the flags when sanitizing: an empty CMAKE_CXX_FLAGS
+          # would drop MSVC's defaults (/EHsc).
+          if [ -n "$FLAGS" ]; then args+=("-DCMAKE_CXX_FLAGS=$FLAGS" "-DCMAKE_EXE_LINKER_FLAGS=$FLAGS"); fi
+          cmake -S . -B build "${args[@]}"
       - name: Build
         run: cmake --build build --config Release -j 4
       - name: Test

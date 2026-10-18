@@ -1,4 +1,5 @@
 #include <set>
+#include <stdexcept>
 
 #include "check.h"
 #include "colony/generate.h"
@@ -39,7 +40,7 @@ int main() {
             if (g.resType[i] == 2) CHECK(g.terrain[i] == 2);  // stone only on rock
             if (g.resType[i] == 1 || g.resType[i] == 3) CHECK(g.terrain[i] == 0);
         }
-        CHECK_MSG(grass > water && trees > 0 && berries > 0, "a playable mix of terrain and resources");
+        CHECK_MSG(grass > water && rock > 0 && trees > 0 && berries > 0 && stone > 0, "a playable mix of terrain and resources");
         // Stockpile is building 0, on clear grass; ids are dense from 0.
         CHECK(c.buildings.size() == 1 && c.buildings.id[0] == 0);
         CHECK(c.buildings.kind[0] == static_cast<int32_t>(BuildingKind::Stockpile));
