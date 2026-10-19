@@ -11,7 +11,7 @@ drawn by Strata's WebGL 2 backend (Strata `docs/WEB.md`).
 | Rules (`src/colony`) | the same code | the same code; CI checks the pinned determinism fingerprint `011ed2b2f364b21b` in wasm under Node (ctest) and in Chromium (smoke test) |
 | OpenUSD | yes (Strata `modules/usd`, `modules/save`) | **no**: OpenUSD is not built for WebAssembly |
 | Saves | Strata's save core (checksummed, verified, fallback, migrations) | **none**. A colony lasts until the tab is closed or reloaded, and the page says so |
-| Content | `content/prefabs.usda` + mods, composed through USD | core content only: the built-in `Stats` (`src/colony/stats.h`) and `Looks` (`src/colony/looks.h`) defaults. `tests/test_core_defaults.cpp` (desktop CI) checks that they equal the USD composition with no mods |
+| Content | `content/prefabs.usda` + mods, composed through USD | core content only: the built-in `Stats` defaults (`src/colony/stats.h`) and `coreLooks()` (`src/colony/looks.h`). `tests/test_core_defaults.cpp` (desktop CI) checks that they equal the USD composition with no mods (which, today, keeps winter trees green: issue #7) |
 | Mods | `--mods a,b` | not available |
 | Entry point | `app/main.cpp` | `app/web_main.cpp` (the browser runs the frame loop) |
 | Scene, cameras, picking | `app/scene.*` | the same files |

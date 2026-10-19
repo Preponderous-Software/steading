@@ -1,7 +1,7 @@
 // The browser build has no OpenUSD, so it draws and plays with the built-in
-// defaults of Stats (colony/stats.h) and Looks (colony/looks.h) instead of
+// Stats defaults (colony/stats.h) and coreLooks() (colony/looks.h) instead of
 // reading content/prefabs.usda. This test (built only with OpenUSD) checks
-// that those defaults are exactly what the desktop game reads from the core
+// that those are exactly what the desktop game reads from the core
 // content with no mods, so both builds play the same rules in the same colours.
 #include <cstdio>
 #include <filesystem>
@@ -35,12 +35,8 @@ int main(int argc, char** argv) {
         CHECK(s->stats().hutCapacity == d.hutCapacity);
         CHECK(s->stats().regrowSummer == d.regrowSummer);
         CHECK(s->stats().regrowWinter == d.regrowWinter);
-        const Looks l;
+        const Looks l = coreLooks();
         const Looks& r = s->looks();
-        auto show = [](const char* name, const float* v) { std::printf("  %s = (%g, %g, %g)\n", name, v[0], v[1], v[2]); };
-        show("read treeSummer", r.treeSummer);
-        show("read treeWinter", r.treeWinter);
-        show("default treeWinter", l.treeWinter);
         CHECK(same3(r.settler, l.settler));
         CHECK(same3(r.hut, l.hut));
         CHECK(same3(r.hutPlan, l.hutPlan));

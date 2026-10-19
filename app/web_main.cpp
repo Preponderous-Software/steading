@@ -7,7 +7,7 @@
 //    and writes nothing anywhere: a colony lives until the tab is closed or
 //    reloaded. The desktop save format is not touched (this file does not
 //    include or link anything from src/bridge or Strata's save module).
-//  - Core content only: Stats and Looks are the built-in defaults, which
+//  - Core content only: the Stats defaults and coreLooks() are built in, and
 //    tests/test_core_defaults.cpp checks against content/prefabs.usda (the
 //    desktop build's composition with no mods). Mods need the desktop game.
 //  - The browser runs the frame loop (emscripten_set_main_loop_arg), and the
@@ -58,7 +58,7 @@ struct Game {
     Colony colony;
     Derived derived;
     const Stats stats{};  // core content (see the file comment)
-    const Looks looks{};
+    const Looks looks = coreLooks();
     std::vector<StrataRenderItem> items;
     int w = 1280, h = 800;        // drawable, pixels
     double cssW = 1280, cssH = 800;  // canvas, CSS pixels (mouse coordinates)
