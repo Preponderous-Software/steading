@@ -23,7 +23,8 @@ parses it, a damaged or missing layer is refused rather than silently skipped, a
 
 A settlement of settlers gathers wood, stone and berries, builds huts and grows. Seasons alternate every 100 ticks;
 in winter trees stop regrowing. Settlers starve without food. **Win** by surviving 5 winters or reaching 60
-settlers; **lose** when nobody is left.
+settlers; **lose** when nobody is left. Winning pauses the game: press Space to keep playing past the win (the
+goal is reached, so it is not announced again), or Esc to quit.
 
 | Input | Action |
 |---|---|
@@ -31,8 +32,17 @@ settlers; **lose** when nobody is left.
 | `+` / `-` | speed |
 | left-drag | designate tiles for gathering (settlers prefer them); Ctrl+drag clears |
 | right-click | plan a hut there (built first when wood allows), or cancel a plan |
+| Tab | switch between the map view and the free-fly camera |
+| W A S D / Q E | fly: move / down, up (Shift: faster) |
+| arrows, middle-drag | fly: look around |
+| mouse wheel | fly: forward / back |
 | F5 / F9 | save now / reload the last save |
 | Esc | quit (saves first) |
+
+Designating and planning work from either camera. `--fly` starts in the free-fly camera (headless screenshots
+too):
+
+![Seed 42 after 600 ticks from the free-fly camera's starting view](docs/images/fly.png)
 
 The game autosaves every 500 ticks off the main thread. Saves live in a slot directory (`--slot DIR`, default
 `saves/default`).

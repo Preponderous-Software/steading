@@ -128,4 +128,65 @@ void pickTile(const View& v, float aspect, float px, float py, int width, int he
     ty = static_cast<int>(std::floor(wz));
 }
 
+namespace {
+
+void flyAxes(const FlyView& f, float fwd[3], float right[3], float up[3]) {
+    const float cp = std::cos(f.pitch), sp = std::sin(f.pitch), cy = std::cos(f.yaw), sy = std::sin(f.yaw);
+    fwd[0] = sy * cp;
+    fwd[1] = sp;
+    fwd[2] = -cy * cp;
+    right[0] = cy;  // fwd x world-up, normalised
+    right[1] = 0;
+    right[2] = sy;
+    up[0] = right[1] * fwd[2] - right[2] * fwd[1];  // right x fwd
+    up[1] = right[2] * fwd[0] - right[0] * fwd[2];
+    up[2] = right[0] * fwd[1] - right[1] * fwd[0];
+}
+
+}  // namespace
+
+StrataCamera flyCamera(const FlyView& f, float aspect) {
+    float fwd[3], right[3], up[3];
+    flyAxes(f, fwd, right, up);
+    const float target[3] = {f.eye[0] + fwd[0], f.eye[1] + fwd[1], f.eye[2] + fwd[2]};
+    return strata::cameraLookAt(f.eye, target, up, f.fovY, aspect, 0.1f, 1000.0f);
+}
+
+FlyView flyFrom(const View& v) {
+    FlyView f;
+    const float back = v.height * 0.6f;
+    f.pitch = -0.7f;
+    f.eye[0] = v.centreX;
+    f.eye[1] = back * std::tan(-f.pitch);
+    f.eye[2] = v.centreZ + back;
+    return f;
+}
+
+void flyMove(FlyView& f, float fwd, float side, float up) {
+    const float cy = std::cos(f.yaw), sy = std::sin(f.yaw);
+    f.eye[0] += sy * fwd + cy * side;
+    f.eye[1] = std::max(0.5f, f.eye[1] + up);
+    f.eye[2] += -cy * fwd + sy * side;
+}
+
+void flyTurn(FlyView& f, float dyaw, float dpitch) {
+    f.yaw = std::remainder(f.yaw + dyaw, 2 * kPi);
+    f.pitch = std::clamp(f.pitch + dpitch, -1.55f, 1.55f);
+}
+
+bool pickTile(const FlyView& f, float aspect, float px, float py, int width, int height, int& tx, int& ty) {
+    float fwd[3], right[3], up[3];
+    flyAxes(f, fwd, right, up);
+    const float nx = 2 * px / static_cast<float>(width) - 1;
+    const float ny = 1 - 2 * py / static_cast<float>(height);
+    const float t = std::tan(f.fovY * kPi / 360.f);
+    float d[3];
+    for (int i = 0; i < 3; ++i) d[i] = fwd[i] + right[i] * nx * t * aspect + up[i] * ny * t;
+    if (d[1] >= -1e-4f) return false;
+    const float s = -f.eye[1] / d[1];  // where the ray meets the ground plane y = 0
+    tx = static_cast<int>(std::floor(f.eye[0] + d[0] * s));
+    ty = static_cast<int>(std::floor(f.eye[2] + d[2] * s));
+    return true;
+}
+
 }  // namespace steading::app
