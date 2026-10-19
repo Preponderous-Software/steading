@@ -3,11 +3,15 @@
 //   steading [--slot DIR] [--new SEED] [--size N] [--settlers N] [--mods a,b]
 //            [--force-mods] [--headless --ticks N --screenshot out.png]
 //            [--frames DIR --frame-every N --width W --height H]   (headless timelapse frames)
+//            [--fly]   (headless: shoot from the free-fly camera's starting view)
 //
 // Controls: Space pause/resume, +/- speed, left-drag designate tiles for
-// gathering (Ctrl+drag clears), right-click plan or cancel a hut, F5 save,
-// F9 reload the last save, H help, Esc quit. The game also autosaves every
-// 500 ticks, off the main thread.
+// gathering (Ctrl+drag clears), right-click plan or cancel a hut, Tab switch
+// between the map view and the free-fly camera (WASD move, Q/E down/up,
+// arrows or middle-drag look, wheel dolly, Shift faster), F5 save, F9 reload
+// the last save, H help, Esc quit. After a win the game pauses; Space keeps
+// playing. The game also autosaves every 500 ticks, off the main thread.
+#include <algorithm>
 #include <chrono>
 #include <cinttypes>
 #include <cstdio>
@@ -31,8 +35,10 @@ using namespace steading;
 namespace {
 
 constexpr int kSpace = 44, kEscape = 41, kEquals = 46, kMinus = 45, kKpPlus = 87, kKpMinus = 86, kF5 = 62,
-              kF9 = 66, kH = 11;
+              kF9 = 66, kH = 11, kTab = 43, kW = 26, kA = 4, kS = 22, kD = 7, kQ = 20, kE = 8, kRight = 79,
+              kLeft = 80, kDown = 81, kUp = 82, kLShift = 225, kRShift = 229;
 constexpr int kCtrl = 0x0040 | 0x0080;
+constexpr int kMaxScancode = 512;
 const int kSpeeds[] = {2, 5, 10, 20, 40};
 
 struct Args {
@@ -49,6 +55,7 @@ struct Args {
     long frameEvery = 10;
     int width = 1280, height = 800;
     float zoom = 1;  // >1 zooms in on the stockpile
+    bool fly = false;  // start in the free-fly camera
 };
 
 void help() {
@@ -56,6 +63,9 @@ void help() {
               "  Space        pause / resume        +/-  speed\n"
               "  Left-drag    designate tiles for gathering (Ctrl: clear)\n"
               "  Right-click  plan a hut (or cancel a plan)\n"
+              "  Tab          map view / free-fly camera\n"
+              "    fly:       WASD move, Q/E down/up, arrows or middle-drag look,\n"
+              "               wheel forward/back, Shift faster\n"
               "  F5           save now              F9   reload the last save\n"
               "  H            this help             Esc  quit (saves first)");
 }
@@ -92,6 +102,7 @@ bool parse(int argc, char** argv, Args& a) {
         else if (k == "--frames") a.framesDir = val();
         else if (k == "--frame-every") a.frameEvery = std::max(1L, std::atol(val().c_str()));
         else if (k == "--zoom") a.zoom = std::max(1.0f, static_cast<float>(std::atof(val().c_str())));
+        else if (k == "--fly") a.fly = true;
         else if (k == "--width") a.width = std::atoi(val().c_str());
         else if (k == "--height") a.height = std::atoi(val().c_str());
         else {
@@ -162,8 +173,10 @@ int main(int argc, char** argv) {
         view.centreZ = static_cast<float>(session->colony().globals.stockY) + 0.5f;
     }
 
+    bool flying = a.fly;  // Tab: the free-fly camera instead of the map view
+    app::FlyView fly = app::flyFrom(view);
     auto draw = [&] {
-        engine->setCamera(app::topDownCamera(view, aspect()));
+        engine->setCamera(flying ? app::flyCamera(fly, aspect()) : app::topDownCamera(view, aspect()));
         StrataFrameDesc fd{};
         fd.clear_flags = STRATA_CLEAR_COLOR | STRATA_CLEAR_DEPTH | STRATA_CLEAR_SKY;
         engine->beginFrame(fd);
@@ -195,7 +208,21 @@ int main(int argc, char** argv) {
     help();
     status(*session);
     using Clock = std::chrono::steady_clock;
-    bool paused = false, running = true, dragging = false;
+    bool paused = false, running = true, dragging = false, looking = false;
+    // A won colony pauses once; Space carries on (a reloaded won save asks again).
+    bool keepPlaying = false;
+    bool held[kMaxScancode] = {};
+    // Pixel -> tile through whichever camera is showing; false off the ground.
+    auto pick = [&](float px, float py, int& tx, int& ty) {
+        if (flying) return app::pickTile(fly, aspect(), px, py, w, h, tx, ty);
+        app::pickTile(view, aspect(), px, py, w, h, tx, ty);
+        return true;
+    };
+    auto announceWin = [&] {
+        status(*session, "-- the colony made it! Space keeps playing, Esc quits (it saves).");
+        paused = true;
+    };
+    if (outcome(session->colony()) == Outcome::Won) announceWin();
     int speed = 1, dragX = 0, dragY = 0;
     double acc = 0;
     auto last = Clock::now();
@@ -219,9 +246,27 @@ int main(int argc, char** argv) {
             else if (e.type == STRATA_EVENT_RESIZED) {
                 engine->drawableSize(w, h);
                 view = app::fitMap(session->colony(), aspect());
+            } else if (e.type == STRATA_EVENT_KEY_UP) {
+                if (e.scancode >= 0 && e.scancode < kMaxScancode) held[e.scancode] = false;
             } else if (e.type == STRATA_EVENT_KEY_DOWN && !e.repeat) {
+                if (e.scancode >= 0 && e.scancode < kMaxScancode) held[e.scancode] = true;
                 if (e.scancode == kEscape) running = false;
-                else if (e.scancode == kSpace) { paused = !paused; status(*session, paused ? "(paused)" : ""); }
+                else if (e.scancode == kSpace) {
+                    if (outcome(session->colony()) == Outcome::Won && !keepPlaying) {
+                        keepPlaying = true;
+                        paused = false;
+                        status(*session, "(playing on past the win)");
+                    } else {
+                        paused = !paused;
+                        status(*session, paused ? "(paused)" : "");
+                    }
+                }
+                else if (e.scancode == kTab) {
+                    flying = !flying;
+                    if (flying) fly = app::flyFrom(view);
+                    dragging = looking = false;
+                    std::printf("%s\n", flying ? "free-fly camera (Tab for the map view)" : "map view");
+                }
                 else if (e.scancode == kEquals || e.scancode == kKpPlus) speed = std::min(speed + 1, 4);
                 else if (e.scancode == kMinus || e.scancode == kKpMinus) speed = std::max(speed - 1, 0);
                 else if (e.scancode == kF5) startSave("F5");
@@ -234,18 +279,25 @@ int main(int argc, char** argv) {
                 }
                 else if (e.scancode == kH) help();
             } else if (e.type == STRATA_EVENT_MOUSE_BUTTON_DOWN) {
-                int tx, ty;
-                app::pickTile(view, aspect(), e.x, e.y, w, h, tx, ty);
-                if (e.button == 1) { dragging = true; dragX = tx; dragY = ty; }
-                else if (e.button == 3 && session->colony().grid.inBounds(tx, ty)) {
+                int tx = -1, ty = -1;
+                const bool onGround = pick(e.x, e.y, tx, ty);
+                if (e.button == 2) looking = flying;
+                else if (e.button == 1 && onGround) { dragging = true; dragX = tx; dragY = ty; }
+                else if (e.button == 3 && onGround && session->colony().grid.inBounds(tx, ty)) {
                     std::string why;
                     if (!cancelPlan(session->colony(), session->derived(), tx, ty) &&
                         !planHut(session->colony(), session->derived(), tx, ty, &why))
                         std::printf("%s\n", why.c_str());
                 }
+            } else if (e.type == STRATA_EVENT_MOUSE_BUTTON_UP && e.button == 2) {
+                looking = false;
+            } else if (e.type == STRATA_EVENT_MOUSE_MOTION && looking) {
+                app::flyTurn(fly, e.dx * 0.004f, -e.dy * 0.004f);
+            } else if (e.type == STRATA_EVENT_MOUSE_WHEEL && flying) {
+                app::flyMove(fly, e.y * std::max(2.0f, fly.eye[1] * 0.25f), 0, 0);
             } else if (e.type == STRATA_EVENT_MOUSE_BUTTON_UP && e.button == 1 && dragging) {
-                int tx, ty;
-                app::pickTile(view, aspect(), e.x, e.y, w, h, tx, ty);
+                int tx = dragX, ty = dragY;
+                pick(e.x, e.y, tx, ty);  // released above the horizon: just the start tile
                 const bool clear = (e.modifiers & kCtrl) != 0;
                 const int n = designate(session->colony(), dragX, dragY, tx, ty, !clear);
                 std::printf("%s %d tile(s)\n", clear ? "cleared" : "designated", n);
@@ -253,10 +305,22 @@ int main(int argc, char** argv) {
             }
         }
         const auto now = Clock::now();
-        acc += std::chrono::duration<double>(now - last).count();
+        const double elapsed = std::chrono::duration<double>(now - last).count();
+        acc += elapsed;
         last = now;
+        if (flying) {
+            // Real-time, so the camera still moves while the colony is paused.
+            const float boost = held[kLShift] || held[kRShift] ? 3.0f : 1.0f;
+            const float dt = static_cast<float>(std::min(0.1, elapsed));
+            const float move = dt * boost * (8.0f + fly.eye[1] * 0.8f);
+            const float turn = dt * 1.5f;
+            auto axis = [&](int pos, int neg) { return (held[pos] ? 1.0f : 0.0f) - (held[neg] ? 1.0f : 0.0f); };
+            app::flyMove(fly, axis(kW, kS) * move, axis(kD, kA) * move, axis(kE, kQ) * move);
+            app::flyTurn(fly, axis(kRight, kLeft) * turn, axis(kUp, kDown) * turn);
+        }
         const double step = 1.0 / kSpeeds[speed];
-        if (paused || outcome(session->colony()) != Outcome::Playing) acc = 0;
+        const Outcome state = outcome(session->colony());
+        if (paused || state == Outcome::Lost || (state == Outcome::Won && !keepPlaying)) acc = 0;
         int guard = 0;
         while (acc >= step && guard++ < 8) {
             acc -= step;
@@ -265,9 +329,17 @@ int main(int argc, char** argv) {
             const Colony& c = session->colony();
             if (c.globals.tick % 100 == 0) status(*session);
             if (c.globals.tick % 500 == 0) startSave("autosave");
-            if (before == Outcome::Playing && outcome(c) != Outcome::Playing) {
-                status(*session, outcome(c) == Outcome::Won ? "-- the colony made it!" : "-- the colony is gone.");
+            if (before == Outcome::Playing && outcome(c) != Outcome::Playing && !keepPlaying) {
+                if (outcome(c) == Outcome::Won) announceWin();
+                else status(*session, "-- the colony is gone.");
                 startSave("end of game");
+                break;
+            }
+            if (keepPlaying && c.settlers.size() == 0) {
+                status(*session, "-- the colony is gone.");
+                keepPlaying = false;
+                startSave("end of game");
+                break;
             }
         }
         pollSave();
