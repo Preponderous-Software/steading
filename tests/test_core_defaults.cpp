@@ -37,6 +37,10 @@ int main(int argc, char** argv) {
         CHECK(s->stats().regrowWinter == d.regrowWinter);
         const Looks l;
         const Looks& r = s->looks();
+        auto show = [](const char* name, const float* v) { std::printf("  %s = (%g, %g, %g)\n", name, v[0], v[1], v[2]); };
+        show("read treeSummer", r.treeSummer);
+        show("read treeWinter", r.treeWinter);
+        show("default treeWinter", l.treeWinter);
         CHECK(same3(r.settler, l.settler));
         CHECK(same3(r.hut, l.hut));
         CHECK(same3(r.hutPlan, l.hutPlan));
