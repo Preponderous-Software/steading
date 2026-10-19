@@ -48,6 +48,18 @@ add_library(steading_mods STATIC src/mods/manifest.cpp)
 target_include_directories(steading_mods PUBLIC src)
 steading_warnings(steading_mods)
 
+# History export to a usd-replay/1 replay (usd-recorder's contract), USD-free: the replay is
+# written as .usda text by usd-recorder's vendored header (third_party/usd_recorder).
+add_library(steading_replay STATIC src/replay/replay.cpp)
+target_include_directories(steading_replay PUBLIC src)
+target_include_directories(steading_replay SYSTEM PRIVATE third_party)
+target_link_libraries(steading_replay PUBLIC steading_colony)
+steading_warnings(steading_replay)
+
+add_executable(steading-replay app/replay.cpp)
+target_link_libraries(steading-replay PRIVATE steading_replay)
+steading_warnings(steading-replay)
+
 add_executable(steading-sim app/sim.cpp)
 target_link_libraries(steading-sim PRIVATE steading_colony)
 steading_warnings(steading-sim)
@@ -55,12 +67,12 @@ steading_warnings(steading-sim)
 if(STEADING_BUILD_TESTS)
   enable_testing()
   set(STEADING_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-  foreach(t generate systems determinism mods)
+  foreach(t generate systems determinism mods replay)
     add_executable(test_${t} tests/test_${t}.cpp)
-    target_link_libraries(test_${t} PRIVATE steading_colony steading_mods)
+    target_link_libraries(test_${t} PRIVATE steading_colony steading_mods steading_replay)
     target_compile_definitions(test_${t} PRIVATE STEADING_SOURCE_DIR="${STEADING_SOURCE_DIR}")
     steading_warnings(test_${t})
-    add_test(NAME ${t} COMMAND test_${t})
+    add_test(NAME ${t} COMMAND test_${t} "${CMAKE_CURRENT_BINARY_DIR}")
   endforeach()
 endif()
 
@@ -83,6 +95,11 @@ if(STEADING_WITH_STRATA)
   target_link_libraries(steading_bridge PUBLIC steading_colony steading_mods strata::save)
   steading_warnings(steading_bridge)
   target_compile_options(steading_bridge PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-conversion>)
+
+  # With saves: steading-replay also takes --slot (loaded from a read-only copy).
+  target_link_libraries(steading-replay PRIVATE steading_bridge)
+  target_compile_definitions(steading-replay PRIVATE STEADING_REPLAY_WITH_SAVES
+                             STEADING_GAME_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
   add_executable(steading app/main.cpp app/scene.cpp)
   target_link_libraries(steading PRIVATE steading_bridge strata::static)

@@ -73,6 +73,37 @@ The same seed at tick 400, without and with `--mods frost_huts`: one USD layer r
 capacity, so the colony also builds fewer of them. The save records the load order, and loading
 with a different set or order is refused unless `--force-mods` is given.
 
+## History replays
+
+A colony's history can be shared as a **replay** in usd-recorder's
+[`usd-replay/1`](https://github.com/Preponderous-Software/usd-recorder/blob/v0.2.0/docs/REPLAY.md) contract: one USD
+file any player of that contract can show, here in [usd-web](https://github.com/Preponderous-Software/usd-web)'s
+browser player.
+
+![Seed 42's first 1,000 ticks as a replay in usd-web's browser player: huts go up around the stockpile, winters whiten the map, trees are cut and regrow](docs/images/replay.gif)
+
+*Seed 42, 1,000 ticks, a sample every 4 ticks: a 0.9 MB `.usdc`, a 55 KB web replay. The panel shows the colony's
+counters and its state fingerprint at each sample.*
+
+```sh
+steading-replay --new 42 --ticks 1000 --every 4 --out run.usda    # from a seed (no save involved)
+steading-replay --slot saves/default --ticks 500 --out run.usda   # from a save (Strata build), read-only
+usd-recorder replay validate run.usda && usd-recorder replay convert run.usda run.usdc
+usd-web replay run.usdc -o site/replay                             # then serve usd-web's viewer/replay.html
+```
+
+Settlers, huts, hut plans, the stockpile, trees (sized by what is left on them, white in winter), stone and berries
+are point sets; the terrain (with winter and designated tiles) is a colour grid; wood, stone, food, settlers,
+housing and winters are stats. Each sample's state hash is the colony's own `fingerprint()`, so the replay of seed
+42 ends on the same `011ed2b2f364b21b` that `tests/test_determinism.cpp` pins, and `tests/test_replay.cpp` checks
+that recording does not change a single fingerprint.
+
+**Saves are only read, never written:** `--slot` copies the slot's save files to a temporary directory and loads
+the copy through the save core (so not even the slot's lock is taken), runs the colony forward with the rules, and
+saves nothing. CI checks the slot's files are byte-identical afterwards and that the history from a save matches a
+fresh run of the same seed tick for tick. The writer is usd-recorder's dependency-free header, vendored in
+`third_party/usd_recorder/`, so the replay needs no OpenUSD; the save format is unchanged.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
