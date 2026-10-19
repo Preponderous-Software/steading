@@ -52,6 +52,22 @@ jobs:
           bin=build/steading-sim; [ -f build/Release/steading-sim.exe ] && bin=build/Release/steading-sim.exe
           "$bin" --ticks 1000
           "$bin" --settlers 1000 --max 1000 --size 160 --ticks 300
+      - name: History replay (usd-replay/1)
+        if: matrix.name == 'gcc-13'
+        run: |
+          build/steading-replay --new 42 --ticks 1000 --every 4 --version "${GITHUB_SHA::12}" --out replay.usda
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q "usd-recorder @ git+https://github.com/Preponderous-Software/usd-recorder@v0.2.0"
+          "$RUNNER_TEMP/venv/bin/usd-recorder" replay validate replay.usda
+          "$RUNNER_TEMP/venv/bin/usd-recorder" replay convert replay.usda steading-seed42.usdc
+          # The replay's last state hash is the pinned fingerprint of test_determinism (seed 42, 1000 ticks).
+          grep -q '1000: "011ed2b2f364b21b"' replay.usda
+      - name: Upload the replay
+        if: matrix.name == 'gcc-13'
+        uses: actions/upload-artifact@v4
+        with:
+          name: steading-replay-seed42
+          path: steading-seed42.usdc
 
   game:
     # The playable game on Strata, with saves through Strata's save core. OpenUSD
@@ -116,6 +132,26 @@ jobs:
         run: |
           build/steading --slot "$RUNNER_TEMP/slot" --new 42 --headless --ticks 400 --screenshot steading-400.png
           build/steading --slot "$RUNNER_TEMP/slot" --headless --ticks 100 --screenshot steading-500.png
+
+      - name: History replay from a save is read-only and matches a fresh run
+        run: |
+          (cd "$RUNNER_TEMP/slot" && sha256sum * | sort) > before.txt
+          build/steading-replay --slot "$RUNNER_TEMP/slot" --ticks 200 --every 5 --out from-save.usda
+          (cd "$RUNNER_TEMP/slot" && sha256sum * | sort) > after.txt
+          diff before.txt after.txt
+          build/steading-replay --new 42 --ticks 700 --every 5 --out fresh.usda
+          python3 - <<'PY'
+          import re
+          def hashes(path):
+              text = open(path).read()
+              block = re.search(r"replay:stateHash.timeSamples = \{(.*?)\}", text, re.S).group(1)
+              return dict(re.findall(r'(\d+): "([0-9a-f]+)"', block))
+          fresh, saved = hashes("fresh.usda"), hashes("from-save.usda")
+          shared = sorted(set(fresh) & set(saved), key=int)
+          assert len(shared) == 41 and shared[0] == "500", shared[:3]
+          assert all(fresh[t] == saved[t] for t in shared), "the history from the save differs from a fresh run"
+          print(f"{len(shared)} shared samples from tick {shared[0]}: identical state hashes")
+          PY
 
       - uses: actions/upload-artifact@v4
         if: always()
