@@ -54,12 +54,23 @@ cmake -S . -B build && cmake --build build && ctest --test-dir build
 ```
 
 The playable game is built on [Strata](https://github.com/Preponderous-Software/strata) and needs an OpenUSD
-install (Strata publishes a prebuilt one for Linux; see Strata's `modules/usd/README.md`):
+install (Strata publishes prebuilt ones for Linux and Windows; see Strata's `modules/usd/README.md`):
 
 ```sh
 cmake -S . -B build -DSTEADING_WITH_STRATA=ON -DSTEADING_STRATA_REF=$(cat strata.ref) \
   -DCMAKE_PREFIX_PATH=/path/to/openusd
 cmake --build build && ctest --test-dir build
+```
+
+On Windows (MSVC), use the Windows prebuilt (`key.sh windows` in Strata) and put its `lib` and `bin` directories on
+`PATH` before running the game or the tests (OpenUSD finds its plugins next to its DLLs):
+
+```bat
+cmake -S . -B build -DSTEADING_WITH_STRATA=ON -DCMAKE_PREFIX_PATH=C:/path/to/openusd
+cmake --build build --config Release
+set PATH=C:\path\to\openusd\lib;C:\path\to\openusd\bin;%PATH%
+ctest --test-dir build -C Release
+build\Release\steading.exe --slot %USERPROFILE%\steading-save
 ```
 
 ## Mods
