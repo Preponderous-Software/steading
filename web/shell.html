@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>steading</title>
+<meta name="description" content="steading: a small colony sim on the Strata engine. Gather, build huts, and see the settlers through five winters.">
+<style>
+  :root {
+    --bg: #10140f; --panel: rgba(16, 20, 15, 0.86); --line: #2f3a2c; --text: #e9eadf; --dim: #a9b0a0;
+    --accent: #e2c84a; --warn: #f0a35e; --btn: #232b20; --btn-on: #4a5a2c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
+  body { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+  #stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  canvas#canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; background: #000; }
+  .bar { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    padding: 6px max(10px, env(safe-area-inset-left)); background: var(--panel); border-color: var(--line);
+    z-index: 2; }
+  #hud { top: 0; border-bottom: 1px solid var(--line); padding-top: max(6px, env(safe-area-inset-top)); }
+  #tools { bottom: 0; border-top: 1px solid var(--line); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  .brand { font-weight: 700; letter-spacing: 0.02em; margin-right: 6px; }
+  .brand a { color: var(--text); text-decoration: none; }
+  .stat { white-space: nowrap; color: var(--dim); }
+  .stat b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .note { margin-left: auto; color: var(--warn); font-size: 12px; white-space: nowrap; }
+  #msg { color: var(--accent); min-height: 1em; flex-basis: 100%; font-size: 12px; }
+  button { font: inherit; color: var(--text); background: var(--btn); border: 1px solid var(--line);
+    border-radius: 6px; padding: 7px 11px; min-height: 36px; cursor: pointer; touch-action: manipulation; }
+  button[aria-pressed="true"] { background: var(--btn-on); border-color: #7d8f45; }
+  button:focus-visible { outline: 2px solid var(--accent); }
+  .group { display: flex; gap: 4px; align-items: center; }
+  .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 2px; }
+  #pad { position: fixed; right: 10px; bottom: 140px; display: none; grid-template-columns: repeat(3, 44px);
+    gap: 4px; z-index: 2; }
+  #pad.on { display: grid; }
+  #pad button { min-height: 44px; padding: 0; }
+  #banner, #loading, #help { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px;
+    z-index: 3; max-width: min(92vw, 440px); text-align: center; }
+  #banner, #help { display: none; }
+  #help { text-align: left; }
+  #help h2, #banner h2 { margin: 0 0 8px; font-size: 17px; }
+  #help ul { margin: 6px 0 10px; padding-left: 18px; }
+  #help li { margin: 3px 0; }
+  kbd { background: #2a3327; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: 12px; }
+  .row { display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+  @media (max-width: 640px) {
+    .note { margin-left: 0; flex-basis: 100%; white-space: normal; }
+    .stat.opt { display: none; }
+    button { padding: 6px 8px; }
+  }
+</style>
+</head>
+<body>
+<div id="hud" class="bar" aria-live="polite">
+  <span class="brand"><a href="https://danielstephenson.dev/play" title="More games">steading</a></span>
+  <span class="stat"><b id="season">summer</b></span>
+  <span class="stat">settlers <b id="settlers">0</b>/<b id="cap">0</b></span>
+  <span class="stat">wood <b id="wood">0</b></span>
+  <span class="stat">stone <b id="stone">0</b></span>
+  <span class="stat">food <b id="food">0</b></span>
+  <span class="stat">winters <b id="winters">0</b>/5</span>
+  <span class="stat opt">tick <b id="tick">0</b></span>
+  <span class="note" title="The browser build has no saves. The desktop game saves through Strata's save core.">Browser preview: no saves, a colony lasts until you leave or reload</span>
+  <span id="msg"></span>
+</div>
+
+<div id="stage"><canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas></div>
+
+<div id="tools" class="bar">
+  <div class="group" role="group" aria-label="Tool">
+    <button data-tool="0" aria-pressed="true" title="Drag over trees, rocks and berries to have them gathered first">Gather</button>
+    <button data-tool="1" aria-pressed="false" title="Drag to clear gathering marks">Clear</button>
+    <button data-tool="2" aria-pressed="false" title="Tap a tile to plan a hut there (tap a plan to cancel it)">Hut</button>
+    <button data-tool="3" aria-pressed="false" id="lookTool" title="Free-fly camera: drag to look around" hidden>Look</button>
+  </div>
+  <span class="sep"></span>
+  <div class="group">
+    <button id="pause" title="Pause / resume (Space)">Pause</button>
+    <button id="slower" title="Slower (-)" aria-label="Slower">&minus;</button>
+    <span class="stat"><b id="tps">5</b>/s</span>
+    <button id="faster" title="Faster (+)" aria-label="Faster">+</button>
+  </div>
+  <span class="sep"></span>
+  <div class="group">
+    <button id="camera" aria-pressed="false" title="Map view / free-fly camera (Tab)">Fly</button>
+    <button id="new" title="Start a new colony with a random seed">New colony</button>
+    <button id="helpBtn" title="How to play">?</button>
+  </div>
+</div>
+
+<div id="pad" aria-label="Camera moves">
+  <span></span><button data-key="26" aria-label="Forward">&uarr;</button><button data-key="8" aria-label="Up">Up</button>
+  <button data-key="4" aria-label="Left">&larr;</button><button data-key="22" aria-label="Back">&darr;</button><button data-key="7" aria-label="Right">&rarr;</button>
+  <span></span><span></span><button data-key="20" aria-label="Down">Dn</button>
+</div>
+
+<div id="loading">Loading steading&hellip;</div>
+
+<div id="banner" role="dialog" aria-labelledby="bannerTitle">
+  <h2 id="bannerTitle">The colony made it!</h2>
+  <div id="bannerText"></div>
+  <div class="row"><button id="keepPlaying">Keep playing</button><button id="newAfter">New colony</button></div>
+</div>
+
+<div id="help" role="dialog" aria-labelledby="helpTitle">
+  <h2 id="helpTitle">How to play</h2>
+  Keep the settlers alive through <b>five winters</b>, or grow to <b>60 settlers</b>. They gather wood, stone and
+  berries on their own and build huts when there is wood to spare. Nothing grows back in winter.
+  <ul>
+    <li><b>Gather</b>: drag over tiles to have them gathered first (<kbd>Ctrl</kbd>+drag or <b>Clear</b> removes the marks).</li>
+    <li><b>Hut</b>: tap a tile, or right-click it, to plan a hut; it is built as soon as there is wood.</li>
+    <li><b>Pause</b> <kbd>Space</kbd>, speed <kbd>-</kbd> <kbd>+</kbd>.</li>
+    <li><b>Fly</b> <kbd>Tab</kbd>: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move, <kbd>Q</kbd>/<kbd>E</kbd> down/up,
+      arrows or middle-drag look, wheel to dolly, <kbd>Shift</kbd> faster. On a touch screen use <b>Look</b> and the arrow pad.</li>
+  </ul>
+  This browser build saves nothing: closing or reloading the tab ends the colony. The desktop game
+  (<a href="https://github.com/Preponderous-Software/steading" style="color:var(--accent)">source</a>) has saves.
+  <div class="row"><button id="helpClose">Play</button></div>
+</div>
+
+<script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  var seed = params.get('seed');
+  if (!/^\d{1,15}$/.test(seed || '')) seed = String(Math.floor(Math.random() * 1e9));
+  var $ = function (id) { return document.getElementById(id); };
+  var ready = false, lastOutcome = 'playing', bannerShown = false;
+
+  function api(name, ret, args) { return Module.cwrap(name, ret, args || []); }
+  var call = {};
+
+  function sizeCanvas() {
+    if (!ready) return;
+    var st = $('stage');
+    call.resize(st.clientWidth, st.clientHeight);
+  }
+
+  function setTool(t) {
+    document.querySelectorAll('[data-tool]').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(Number(b.dataset.tool) === t));
+    });
+    call.setTool(t);
+  }
+
+  function refresh() {
+    if (!ready) return;
+    var s;
+    try { s = JSON.parse(call.status()); } catch (e) { return; }
+    $('season').textContent = s.season;
+    $('settlers').textContent = s.settlers; $('cap').textContent = s.cap;
+    $('wood').textContent = s.wood; $('stone').textContent = s.stone; $('food').textContent = s.food;
+    $('winters').textContent = s.winters; $('tick').textContent = s.tick; $('tps').textContent = s.tps;
+    $('msg').textContent = s.message;
+    $('pause').textContent = s.paused ? 'Resume' : 'Pause';
+    $('camera').setAttribute('aria-pressed', String(s.flying));
+    $('pad').classList.toggle('on', s.flying);
+    $('lookTool').hidden = !s.flying;
+    if (!s.flying && s.tool === 3) setTool(0);
+    document.body.dataset.outcome = s.outcome;
+    if (s.outcome !== lastOutcome) {
+      if (s.outcome === 'won' && !s.keepPlaying && !bannerShown) {
+        bannerShown = true;
+        $('bannerTitle').textContent = 'The colony made it!';
+        $('bannerText').textContent = s.settlers + ' settlers after ' + s.winters + ' winters.';
+        $('keepPlaying').hidden = false;
+        $('banner').style.display = 'block';
+      } else if (s.outcome === 'lost') {
+        $('bannerTitle').textContent = 'The colony is gone';
+        $('bannerText').textContent = 'It lasted ' + s.winters + ' winters.';
+        $('keepPlaying').hidden = true;
+        $('banner').style.display = 'block';
+      }
+      lastOutcome = s.outcome;
+    }
+  }
+
+  function newColony() {
+    bannerShown = false; lastOutcome = 'playing';
+    $('banner').style.display = 'none';
+    call.newColony(Math.floor(Math.random() * 1e9));
+  }
+
+  function wire() {
+    // A clicked button keeps no focus, so Space and Tab still reach the game.
+    document.querySelectorAll('button').forEach(function (b) {
+      b.addEventListener('click', function () { b.blur(); });
+    });
+    document.querySelectorAll('[data-tool]').forEach(function (b) {
+      b.addEventListener('click', function () { setTool(Number(b.dataset.tool)); });
+    });
+    $('pause').addEventListener('click', function () { call.togglePause(); refresh(); });
+    $('slower').addEventListener('click', function () { call.speed(-1); refresh(); });
+    $('faster').addEventListener('click', function () { call.speed(1); refresh(); });
+    $('camera').addEventListener('click', function () { call.toggleFly(); refresh(); });
+    $('new').addEventListener('click', newColony);
+    $('newAfter').addEventListener('click', newColony);
+    $('keepPlaying').addEventListener('click', function () {
+      $('banner').style.display = 'none'; call.togglePause(); refresh();
+    });
+    $('helpBtn').addEventListener('click', function () { $('help').style.display = 'block'; });
+    $('helpClose').addEventListener('click', function () { $('help').style.display = 'none'; });
+    document.querySelectorAll('#pad [data-key]').forEach(function (b) {
+      var k = Number(b.dataset.key);
+      var down = function (e) { e.preventDefault(); call.hold(k, 1); };
+      var up = function (e) { e.preventDefault(); call.hold(k, 0); };
+      b.addEventListener('pointerdown', down);
+      b.addEventListener('pointerup', up);
+      b.addEventListener('pointercancel', up);
+      b.addEventListener('pointerleave', up);
+    });
+    window.addEventListener('resize', sizeCanvas);
+    if (window.ResizeObserver) new ResizeObserver(sizeCanvas).observe($('stage'));
+    setInterval(refresh, 250);
+  }
+
+  window.Module = {
+    canvas: $('canvas'),
+    arguments: [seed],
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.warn(t); },
+    onGameReady: function () {
+      call = {
+        togglePause: api('steading_toggle_pause'), toggleFly: api('steading_toggle_fly'),
+        speed: api('steading_speed', null, ['number']), setTool: api('steading_set_tool', null, ['number']),
+        hold: api('steading_hold', null, ['number', 'number']),
+        newColony: api('steading_new_colony', null, ['number']),
+        resize: api('steading_resize', null, ['number', 'number']),
+        advance: api('steading_advance', null, ['number']),
+        fingerprint: api('steading_fingerprint', 'string', ['number', 'number']),
+        status: api('steading_status', 'string')
+      };
+      window.steading = call;  // for the smoke test and the curious
+      ready = true;
+      $('loading').style.display = 'none';
+      wire();
+      sizeCanvas();
+      refresh();
+    },
+    onRendererFailed: function (why) {
+      $('loading').textContent = 'steading needs WebGL 2, which this browser did not provide (' + why + ').';
+    },
+    onAbort: function (what) {
+      $('loading').style.display = 'block';
+      $('loading').textContent = 'steading stopped: ' + what;
+    }
+  };
+})();
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>
