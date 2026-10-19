@@ -12,7 +12,7 @@ option(STEADING_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(STEADING_BUILD_TESTS "Build the test suite" ON)
 option(STEADING_WITH_STRATA "Build the playable game and save integration on the Strata engine (needs OpenUSD)" OFF)
 # The Strata commit the game is built against. Pinned; bump deliberately.
-set(STEADING_STRATA_REF "f3e44a2e23666c96d7acf458a84c1b4af70aa312" CACHE STRING "Strata git ref (a full commit SHA in CI)")
+set(STEADING_STRATA_REF "dd65ba274906d27d18551072fbbe258f4c83907d" CACHE STRING "Strata git ref (a full commit SHA in CI)")
 
 function(steading_warnings target)
   if(MSVC)
