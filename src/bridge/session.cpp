@@ -1,8 +1,7 @@
 #include "session.h"
 
-#include <dirent.h>
-
 #include <algorithm>
+#include <filesystem>
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/vt/array.h>
@@ -55,14 +54,11 @@ bool readLooks(const std::vector<std::string>& stack, Looks& l, std::string* err
 std::vector<mods::Manifest> discoverMods(const std::string& gameDir, std::vector<std::string>* errors) {
     std::vector<mods::Manifest> out;
     const std::string dir = gameDir + "/mods";
-    DIR* d = ::opendir(dir.c_str());
-    if (!d) return out;
     std::vector<std::string> names;
-    while (dirent* e = ::readdir(d)) {
-        const std::string n = e->d_name;
-        if (n != "." && n != "..") names.push_back(n);
-    }
-    ::closedir(d);
+    std::error_code ec;
+    for (std::filesystem::directory_iterator it(std::filesystem::u8path(dir), ec), end; !ec && it != end;
+         it.increment(ec))
+        names.push_back(it->path().filename().u8string());
     std::sort(names.begin(), names.end());
     for (const auto& n : names) {
         mods::Manifest m;

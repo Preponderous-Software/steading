@@ -159,3 +159,54 @@ jobs:
           name: steading-screenshots
           path: steading-*.png
           if-no-files-found: ignore
+
+  game-windows:
+    # The game and its save tests on Windows (MSVC), against the Windows OpenUSD
+    # prebuilt Strata's CI publishes (key.sh windows). No headless smoke here:
+    # Strata's headless surface is EGL surfaceless, which is Linux-only.
+    name: game on Strata (Windows, MSVC)
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out the pinned Strata
+        run: |
+          ref="$(tr -d '[:space:]' < strata.ref)"
+          git init -q "$RUNNER_TEMP/strata"
+          git -C "$RUNNER_TEMP/strata" fetch -q --depth 1 https://github.com/Preponderous-Software/strata.git "$ref"
+          git -C "$RUNNER_TEMP/strata" checkout -q FETCH_HEAD
+          echo "STRATA_DIR=$(cygpath -m "$RUNNER_TEMP/strata")" >> "$GITHUB_ENV"
+          echo "OPENUSD_KEY=$(bash "$RUNNER_TEMP/strata/modules/usd/openusd/key.sh" windows)" >> "$GITHUB_ENV"
+
+      - name: Restore the OpenUSD prebuilt
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: openusd-dist
+          key: ${{ env.OPENUSD_KEY }}
+
+      - name: Download the OpenUSD prebuilt
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p openusd-dist
+          curl -fsSL -o "openusd-dist/${OPENUSD_KEY}.tar.gz" \
+            "https://github.com/Preponderous-Software/strata/releases/download/${OPENUSD_KEY}/${OPENUSD_KEY}.tar.gz"
+
+      - name: Configure
+        run: |
+          mkdir -p /c/openusd && tar -C /c/openusd -xzf "openusd-dist/${OPENUSD_KEY}.tar.gz"
+          # OpenUSD finds its plugins next to its DLLs: put them on PATH, never copy them.
+          echo "C:\\openusd\\${OPENUSD_KEY}\\lib" >> "$GITHUB_PATH"
+          echo "C:\\openusd\\${OPENUSD_KEY}\\bin" >> "$GITHUB_PATH"
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DSTEADING_WARNINGS_AS_ERRORS=ON \
+            -DSTEADING_WITH_STRATA=ON -DFETCHCONTENT_SOURCE_DIR_STRATA="$STRATA_DIR" \
+            -DCMAKE_PREFIX_PATH="C:/openusd/${OPENUSD_KEY}" -Wno-dev
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Test (rules and saves through Strata)
+        run: ctest --test-dir build -C Release --output-on-failure

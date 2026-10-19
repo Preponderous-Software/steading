@@ -19,11 +19,9 @@
 #include "replay/replay.h"
 
 #ifdef STEADING_REPLAY_WITH_SAVES
-#include <dirent.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
-#include <fstream>
+#include <filesystem>
+#include <random>
+#include <system_error>
 #include <vector>
 
 #include "bridge/session.h"
@@ -45,55 +43,50 @@ int usage() {
 }
 
 #ifdef STEADING_REPLAY_WITH_SAVES
-void removeDir(const std::string& dir);
+namespace fs = std::filesystem;
+
+void removeDir(const std::string& dir) {
+    std::error_code ec;
+    fs::remove_all(fs::u8path(dir), ec);
+}
 
 // Copy the save files of `from` (every regular file but the save core's LOCK) into a fresh
 // temporary directory; returns its path ("" on error, with nothing left behind).
 std::string copySlot(const std::string& from, std::string* err) {
-    const char* tmp = std::getenv("TMPDIR");
-    std::string tmpl = std::string(tmp && *tmp ? tmp : "/tmp") + "/steading-replay-XXXXXX";
-    if (!::mkdtemp(tmpl.data())) {
-        *err = "cannot create a temporary directory";
+    std::error_code ec;
+    const fs::path base = fs::temp_directory_path(ec);
+    if (ec) {
+        *err = "cannot find the temporary directory";
         return "";
     }
-    DIR* d = ::opendir(from.c_str());
-    if (!d) {
+    std::random_device rd;
+    fs::path tmp;
+    for (int tries = 0;; ++tries) {
+        char name[32];
+        std::snprintf(name, sizeof name, "steading-replay-%08x", static_cast<unsigned>(rd()));
+        tmp = base / name;
+        if (fs::create_directory(tmp, ec)) break;
+        if (tries == 100) {
+            *err = "cannot create a temporary directory";
+            return "";
+        }
+    }
+    const std::string tmpl = tmp.u8string();
+    fs::directory_iterator it(fs::u8path(from), ec);
+    if (ec) {
         removeDir(tmpl);
         *err = "cannot open slot " + from;
         return "";
     }
-    bool ok = true;
-    while (dirent* e = ::readdir(d)) {
-        const std::string name = e->d_name, src = from + "/" + name;
-        struct stat st {};
-        if (name == "LOCK" || ::stat(src.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) continue;
-        std::ifstream in(src, std::ios::binary);
-        std::ofstream out(tmpl + "/" + name, std::ios::binary);
-        std::vector<char> buf(static_cast<size_t>(st.st_size));
-        if (!in.read(buf.data(), static_cast<std::streamsize>(buf.size())) ||
-            !out.write(buf.data(), static_cast<std::streamsize>(buf.size()))) {
-            ok = false;
-            *err = "cannot copy " + src;
-            break;
+    for (const fs::directory_entry& e : it) {
+        if (e.path().filename() == "LOCK" || !e.is_regular_file(ec)) continue;
+        if (!fs::copy_file(e.path(), tmp / e.path().filename(), ec)) {
+            removeDir(tmpl);
+            *err = "cannot copy " + e.path().u8string();
+            return "";
         }
-    }
-    ::closedir(d);
-    if (!ok) {
-        removeDir(tmpl);
-        return "";
     }
     return tmpl;
-}
-
-void removeDir(const std::string& dir) {
-    if (DIR* d = ::opendir(dir.c_str())) {
-        while (dirent* e = ::readdir(d)) {
-            const std::string name = e->d_name;
-            if (name != "." && name != "..") std::remove((dir + "/" + name).c_str());
-        }
-        ::closedir(d);
-    }
-    ::rmdir(dir.c_str());
 }
 #endif
 

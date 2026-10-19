@@ -11,6 +11,7 @@
 //  - a damaged latest save falls back to the previous one, loudly.
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <string>
 
@@ -28,7 +29,9 @@ const std::string kGame = STEADING_SOURCE_DIR;
 
 std::string freshDir(const std::string& name) {
     const std::string d = root + "/" + name;
-    if (std::system(("rm -rf '" + d + "' && mkdir -p '" + d + "'").c_str()) != 0) std::printf("  rm failed\n");
+    std::error_code ec;
+    std::filesystem::remove_all(std::filesystem::u8path(d), ec);
+    std::filesystem::create_directories(std::filesystem::u8path(d), ec);
     return d;
 }
 
@@ -42,8 +45,9 @@ std::unique_ptr<Session> open(const std::string& dir, std::vector<std::string> m
 }  // namespace
 
 int main(int argc, char** argv) {
-    root = argc > 1 ? argv[1] : "/tmp/steading-save-tests";
-    if (std::system(("mkdir -p '" + root + "'").c_str()) != 0) return 1;
+    root = argc > 1 ? argv[1] : (std::filesystem::temp_directory_path() / "steading-save-tests").u8string();
+    std::error_code ec;
+    if (!std::filesystem::create_directories(std::filesystem::u8path(root), ec) && ec) return 1;
 
     SECTION("components <-> Strata world is lossless");
     {
