@@ -11,6 +11,9 @@ arrays. It is built on **Strata**, a shared C++ engine.
 Status: early development (RFC 0019 milestone M2, "colony v0"). The colony plays, saves and reloads through Strata's
 save core, and two demo mods stack in load order.
 
+**Play it in your browser:** https://steading.play.danielstephenson.dev (no saves there: a colony lasts until
+the tab is closed; see [docs/WEB.md](docs/WEB.md)).
+
 ## Design in one paragraph
 
 A seed generates a **base layer**. Prefabs (settler, hut, tree, …) live in a content library that entities

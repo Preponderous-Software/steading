@@ -5,7 +5,8 @@
 
 #include <vector>
 
-#include "bridge/session.h"
+#include "colony/looks.h"
+#include "colony/stats.h"
 #include "colony/systems.h"
 #include "strata/strata.h"
 
