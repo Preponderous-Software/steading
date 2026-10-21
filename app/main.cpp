@@ -1,8 +1,8 @@
 // steading: the playable colony on the Strata engine.
 //
-//   steading [--slot DIR] [--new SEED] [--size N] [--settlers N] [--mods a,b]
+//   steading [--slot DIR] [--game-dir DIR] [--new SEED] [--size N] [--settlers N] [--mods a,b]
 //            [--force-mods] [--headless --ticks N --screenshot out.png]
-//            [--frames DIR --frame-every N --width W --height H]   (headless timelapse frames)
+//            [--frames DIR --frame-every N --width W --height H --zoom Z]   (headless timelapse frames)
 //            [--fly]   (headless: shoot from the free-fly camera's starting view)
 //
 // Controls: Space pause/resume, +/- speed, left-drag designate tiles for
