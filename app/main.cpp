@@ -106,7 +106,12 @@ bool parse(int argc, char** argv, Args& a) {
         else if (k == "--width") a.width = std::atoi(val().c_str());
         else if (k == "--height") a.height = std::atoi(val().c_str());
         else {
-            std::fprintf(stderr, "unknown argument %s\n", k.c_str());
+            std::fprintf(stderr,
+                         "unknown argument %s\n"
+                         "usage: steading [--slot DIR] [--game-dir DIR] [--new SEED] [--size N] [--settlers N]\n"
+                         "                [--mods a,b] [--force-mods] [--headless --ticks N --screenshot out.png]\n"
+                         "                [--frames DIR --frame-every N --width W --height H --zoom Z] [--fly]\n",
+                         k.c_str());
             return false;
         }
     }
