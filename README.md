@@ -118,8 +118,7 @@ usd-web replay run.usdc -o site/replay                             # then serve 
 ```
 
 Settlers, huts, hut plans, the stockpile, trees (sized by what is left on them, white in winter), stone and berries
-are point sets (a replay from a save uses the colours the slot's content composes to, which today keep winter trees
-green: issue #7); the terrain (with winter and designated tiles) is a colour grid; wood, stone, food, settlers,
+are point sets (a replay from a save uses the colours the slot's content composes to); the terrain (with winter and designated tiles) is a colour grid; wood, stone, food, settlers,
 housing and winters are stats. Each sample's state hash is the colony's own `fingerprint()`, so the replay of seed
 42 ends on the same `011ed2b2f364b21b` that `tests/test_determinism.cpp` pins, and `tests/test_replay.cpp` checks
 that recording does not change a single fingerprint.
