@@ -177,8 +177,10 @@ if(STEADING_WEB)
   set_target_properties(steading-web PROPERTIES OUTPUT_NAME steading SUFFIX ".html")
   target_link_options(steading-web PRIVATE
     -sSTACK_SIZE=1MB
-    "-sEXPORTED_FUNCTIONS=_main,_steading_toggle_pause,_steading_toggle_fly,_steading_speed,_steading_set_tool,_steading_hold,_steading_new_colony,_steading_resize,_steading_advance,_steading_fingerprint,_steading_status"
+    "-sEXPORTED_FUNCTIONS=_main,_steading_toggle_pause,_steading_toggle_fly,_steading_speed,_steading_set_tool,_steading_hold,_steading_new_colony,_steading_resize,_steading_advance,_steading_fingerprint,_steading_status,_steading_bench_view"
     -sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString
     "--shell-file=${CMAKE_CURRENT_SOURCE_DIR}/web/shell.html")
   set_property(TARGET steading-web APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/web/shell.html")
+  # The page's ?bench mode (web/bench.js) is served next to it.
+  configure_file(web/bench.js "${CMAKE_CURRENT_BINARY_DIR}/bench.js" COPYONLY)
 endif()
