@@ -13,7 +13,7 @@ option(STEADING_BUILD_TESTS "Build the test suite" ON)
 option(STEADING_WITH_STRATA "Build the playable game and save integration on the Strata engine (needs OpenUSD)" OFF)
 option(STEADING_WEB "Build the browser game (Emscripten + Strata's WebGL 2 backend; no OpenUSD, no saves)" OFF)
 # The Strata commit the game is built against. Pinned; bump deliberately.
-set(STEADING_STRATA_REF "dd65ba274906d27d18551072fbbe258f4c83907d" CACHE STRING "Strata git ref (a full commit SHA in CI)")
+set(STEADING_STRATA_REF "7f0c23ea7c80b4d7494742d14adee4f94e050b26" CACHE STRING "Strata git ref (a full commit SHA in CI)")
 
 # Emscripten: the rules, tools and tests build as they are and the tests run
 # under Node; STEADING_WEB adds the browser game. Strata compiles C++
