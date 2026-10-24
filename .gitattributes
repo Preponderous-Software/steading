@@ -1,0 +1,6 @@
+# Mods and core content are hashed into every save's manifest, so a save
+# written from a checkout on one system must find the same bytes on every
+# other: never convert their line endings (a Windows checkout with
+# core.autocrlf would otherwise warn that "a mod's content changed").
+mods/** -text
+content/** -text

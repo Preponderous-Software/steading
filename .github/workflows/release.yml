@@ -284,9 +284,11 @@ jobs:
           $out = & cmd.exe /c "`"$bat`" --check-packaging 2>&1"
           $code = $LASTEXITCODE
           $out | Write-Host
+          Write-Host "steading.bat exited $code"
           if ($code -ne 2 -or -not ($out -match 'usage: steading')) {
             Write-Error "steading.exe did not start from the package (exit $code)."; exit 1
           }
+          exit 0
 
       - name: Archive
         shell: pwsh
