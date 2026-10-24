@@ -19,6 +19,9 @@
 using namespace steading;
 namespace fs = std::filesystem;
 
+static_assert(schema::kSchemaVersion == 1,
+              "a new save format needs its own v<N>- fixture in tests/fixtures (README.md there)");
+
 namespace {
 
 const std::string kGame = STEADING_SOURCE_DIR;
@@ -58,7 +61,6 @@ int main(int argc, char** argv) {
     root = argc > 1 ? argv[1] : (fs::temp_directory_path() / "steading-fixture-tests").u8string();
     std::error_code ec;
     fs::create_directories(fs::u8path(root), ec);
-    CHECK(schema::kSchemaVersion == 1);  // a new format needs its own v<N>- fixture here
 
     // What the game printed when it wrote each fixture (tests/fixtures/README.md).
     const Expect fixtures[] = {

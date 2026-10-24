@@ -229,9 +229,11 @@ jobs:
 
       - name: Download the OpenUSD prebuilt
         run: |
-          curl -fsSL -o "$RUNNER_TEMP/${OPENUSD_KEY}.tar.gz" \
+          # A relative archive path: GNU tar reads "D:/..." as a remote host.
+          mkdir -p openusd-dist
+          curl -fsSL -o "openusd-dist/${OPENUSD_KEY}.tar.gz" \
             "https://github.com/Preponderous-Software/strata/releases/download/${OPENUSD_KEY}/${OPENUSD_KEY}.tar.gz"
-          mkdir -p /c/openusd && tar -C /c/openusd -xzf "$RUNNER_TEMP/${OPENUSD_KEY}.tar.gz"
+          mkdir -p /c/openusd && tar -C /c/openusd -xzf "openusd-dist/${OPENUSD_KEY}.tar.gz"
 
       - name: Build
         run: |
