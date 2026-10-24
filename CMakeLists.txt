@@ -139,6 +139,13 @@ if(STEADING_WITH_STRATA)
     steading_warnings(test_saves)
     add_test(NAME saves COMMAND test_saves "${CMAKE_CURRENT_BINARY_DIR}/save-test-out")
 
+    # Released saves (tests/fixtures, written by the game itself) keep loading.
+    add_executable(test_save_fixtures tests/test_save_fixtures.cpp)
+    target_link_libraries(test_save_fixtures PRIVATE steading_bridge)
+    target_compile_definitions(test_save_fixtures PRIVATE STEADING_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    steading_warnings(test_save_fixtures)
+    add_test(NAME save_fixtures COMMAND test_save_fixtures "${CMAKE_CURRENT_BINARY_DIR}/save-fixture-test-out")
+
     # The browser build's built-in Stats/Looks equal the core content read through USD.
     add_executable(test_core_defaults tests/test_core_defaults.cpp)
     target_link_libraries(test_core_defaults PRIVATE steading_bridge)

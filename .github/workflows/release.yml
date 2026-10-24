@@ -1,0 +1,341 @@
+# Builds the desktop game for Linux x64 and Windows x64 and attaches the
+# downloads to a GitHub release. macOS is not built (Strata has no macOS build).
+#
+#   - Publishing a release (gh release create <tag> ...) or pushing a bare
+#     version tag (0.1.0, no "v") builds both and uploads them to that release.
+#     A pushed tag with no release yet gets a pre-release created for it.
+#   - A pull request that changes this workflow or CMakeLists.txt runs the same
+#     build as a dry run, so a packaging change is checked before it merges.
+#   - workflow_dispatch builds both from the chosen branch and keeps them as
+#     workflow artifacts. Give it a tag to build that tag and attach the builds
+#     to its existing release instead.
+#
+# Strata and SDL3 are linked in statically. OpenUSD is not: the game loads
+# Strata's prebuilt OpenUSD (the same release asset ci.yml uses) at run time,
+# so each download carries OpenUSD's libraries and plugins, the game's content
+# (content/, mods/) and a launcher that points the game at them. See
+# docs/RELEASING.md.
+name: Release
+
+on:
+  release:
+    types: [published]
+  push:
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "CMakeLists.txt"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build and attach to (empty = dry run: workflow artifacts only)"
+        required: false
+        default: ""
+
+# A release created with gh release create also pushes its tag, so both events
+# fire for one release. Keyed on the tag, the later run replaces the earlier.
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  meta:
+    name: Resolve the version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      ref: ${{ steps.resolve.outputs.ref }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Resolve tag and ref
+        id: resolve
+        env:
+          EVENT: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          case "$EVENT" in
+            release)           tag="$RELEASE_TAG" ;;
+            push)              tag="$REF_NAME" ;;
+            workflow_dispatch) tag="$INPUT_TAG" ;;
+            *)                 tag="" ;;
+          esac
+          if [ -n "$tag" ]; then
+            if ! [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Release tags are bare version numbers such as 0.1.0, not '$tag'."
+              exit 1
+            fi
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            echo "ref=refs/tags/$tag" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.ref }}
+
+      - name: Read the project version and check it against the tag
+        id: version
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+        run: |
+          version=$(sed -n 's/^project(steading VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          if [ -z "$version" ]; then
+            echo "::error::Could not read the version from project(steading VERSION ...) in CMakeLists.txt."
+            exit 1
+          fi
+          if [ -n "$TAG" ] && [ "$version" != "$TAG" ]; then
+            echo "::error::CMakeLists.txt says $version but the tag is $TAG. Bump the project version first (docs/RELEASING.md)."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building steading $version (tag: ${TAG:-none, dry run})"
+
+  linux:
+    name: Linux x64 build
+    needs: meta
+    # Strata's OpenUSD prebuilt is built on Ubuntu 24.04 with GCC 13, so the
+    # game is too, in the same pinned container ci.yml uses; the download
+    # needs glibc 2.39 or newer.
+    runs-on: ubuntu-latest
+    container: ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      GALLIUM_DRIVER: llvmpipe
+      __EGL_VENDOR_LIBRARY_FILENAMES: /usr/share/glvnd/egl_vendor.d/50_mesa.json
+    steps:
+      - name: Install toolchain, SDL3 build dependencies and Mesa
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git curl python3 build-essential cmake zstd pkg-config binutils \
+            libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev libxss-dev \
+            libegl1 libegl-mesa0 libgl1-mesa-dri libgl1
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.meta.outputs.ref }}
+
+      - name: Check out the pinned Strata
+        run: |
+          ref="$(tr -d '[:space:]' < strata.ref)"
+          git init -q "$RUNNER_TEMP/strata"
+          git -C "$RUNNER_TEMP/strata" fetch -q --depth 1 https://github.com/Preponderous-Software/strata.git "$ref"
+          git -C "$RUNNER_TEMP/strata" checkout -q FETCH_HEAD
+          echo "STRATA_DIR=$RUNNER_TEMP/strata" >> "$GITHUB_ENV"
+          echo "OPENUSD_KEY=$(bash "$RUNNER_TEMP/strata/modules/usd/openusd/key.sh")" >> "$GITHUB_ENV"
+
+      - name: Download the OpenUSD prebuilt
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/${OPENUSD_KEY}.tar.gz" \
+            "https://github.com/Preponderous-Software/strata/releases/download/${OPENUSD_KEY}/${OPENUSD_KEY}.tar.gz"
+          mkdir -p /opt/openusd && tar -C /opt/openusd -xzf "$RUNNER_TEMP/${OPENUSD_KEY}.tar.gz"
+
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSTEADING_BUILD_TESTS=OFF \
+            -DSTEADING_WITH_STRATA=ON -DFETCHCONTENT_SOURCE_DIR_STRATA="$STRATA_DIR" \
+            -DCMAKE_PREFIX_PATH="/opt/openusd/${OPENUSD_KEY}" -Wno-dev
+          cmake --build build -j "$(nproc)" --target steading
+
+      # The game's content and OpenUSD's libraries and plugins go beside the
+      # executable; steading.sh points the game and the loader at them.
+      - name: Assemble the package
+        run: |
+          dir="dist/Steading-$VERSION-linux-x64"
+          usd="/opt/openusd/${OPENUSD_KEY}"
+          mkdir -p "$dir/bin" "$dir/lib"
+          cp build/steading "$dir/bin/steading"
+          strip "$dir/bin/steading"
+          cp -r content mods "$dir/"
+          cp -a "$usd"/lib/*.so* "$dir/lib/"
+          cp -r "$usd/lib/usd" "$dir/lib/usd"
+          if [ -d "$usd/plugin" ]; then cp -r "$usd/plugin" "$dir/plugin"; fi
+          cp -r "$usd/share/licenses" "$dir/licenses"
+          cp LICENSE "$dir/LICENSE.txt"
+          cp docs/THIRD-PARTY.md "$dir/THIRD-PARTY.md"
+          cp docs/README-download.txt "$dir/README.txt"
+          cat > "$dir/steading.sh" <<'SH'
+          #!/bin/sh
+          # Starts steading with the content and libraries in this directory.
+          here="$(cd "$(dirname "$0")" && pwd)"
+          LD_LIBRARY_PATH="$here/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" exec "$here/bin/steading" --game-dir "$here" "$@"
+          SH
+          chmod +x "$dir/steading.sh"
+          ls -la "$dir" "$dir/lib" | head -40
+
+      # The packaged game, not the build output, plays a new colony headless on
+      # Mesa llvmpipe, saves it, and continues from that save. The OpenUSD
+      # install it was built against is moved away first, so only the
+      # libraries in the download can be the ones it loads.
+      - name: The packaged game plays, saves and continues
+        run: |
+          mv /opt/openusd /opt/openusd-moved
+          cd "dist/Steading-$VERSION-linux-x64"
+          LD_LIBRARY_PATH="$PWD/lib" ldd bin/steading | grep -E 'usd|tbb'
+          ./steading.sh --slot "$RUNNER_TEMP/slot" --new 42 --headless --ticks 400 --screenshot "$RUNNER_TEMP/steading-400.png"
+          ./steading.sh --slot "$RUNNER_TEMP/slot" --headless --ticks 100 --screenshot "$RUNNER_TEMP/steading-500.png" | tee "$RUNNER_TEMP/continue.txt"
+          grep -q "^tick 500 " "$RUNNER_TEMP/continue.txt"
+          mv /opt/openusd-moved /opt/openusd
+
+      - name: Archive
+        run: |
+          cd dist
+          tar -czf "Steading-$VERSION-linux-x64.tar.gz" "Steading-$VERSION-linux-x64"
+          sha256sum "Steading-$VERSION-linux-x64.tar.gz" > "Steading-$VERSION-linux-x64.tar.gz.sha256"
+          ls -l
+
+      - name: Upload the package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Steading-${{ env.VERSION }}-linux-x64
+          path: |
+            dist/Steading-${{ env.VERSION }}-linux-x64.tar.gz
+            dist/Steading-${{ env.VERSION }}-linux-x64.tar.gz.sha256
+          if-no-files-found: error
+
+  windows:
+    name: Windows x64 build
+    needs: meta
+    runs-on: windows-2022
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.meta.outputs.ref }}
+
+      - name: Check out the pinned Strata
+        run: |
+          ref="$(tr -d '[:space:]' < strata.ref)"
+          git init -q "$RUNNER_TEMP/strata"
+          git -C "$RUNNER_TEMP/strata" fetch -q --depth 1 https://github.com/Preponderous-Software/strata.git "$ref"
+          git -C "$RUNNER_TEMP/strata" checkout -q FETCH_HEAD
+          echo "STRATA_DIR=$(cygpath -m "$RUNNER_TEMP/strata")" >> "$GITHUB_ENV"
+          echo "OPENUSD_KEY=$(bash "$RUNNER_TEMP/strata/modules/usd/openusd/key.sh" windows)" >> "$GITHUB_ENV"
+
+      - name: Download the OpenUSD prebuilt
+        run: |
+          # A relative archive path: GNU tar reads "D:/..." as a remote host.
+          mkdir -p openusd-dist
+          curl -fsSL -o "openusd-dist/${OPENUSD_KEY}.tar.gz" \
+            "https://github.com/Preponderous-Software/strata/releases/download/${OPENUSD_KEY}/${OPENUSD_KEY}.tar.gz"
+          mkdir -p /c/openusd && tar -C /c/openusd -xzf "openusd-dist/${OPENUSD_KEY}.tar.gz"
+
+      - name: Build
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DSTEADING_BUILD_TESTS=OFF \
+            -DSTEADING_WITH_STRATA=ON -DFETCHCONTENT_SOURCE_DIR_STRATA="$STRATA_DIR" \
+            -DCMAKE_PREFIX_PATH="C:/openusd/${OPENUSD_KEY}" -Wno-dev
+          cmake --build build --config Release --parallel 4 --target steading
+
+      # OpenUSD finds its plugins next to its DLLs, so lib/ and bin/ are copied
+      # whole and steading.bat puts both on PATH. OpenUSD is built against the
+      # dynamic C++ runtime, so the Visual C++ runtime DLLs are carried too (an
+      # app-local copy), for machines without the redistributable.
+      - name: Assemble the package
+        run: |
+          dir="dist/Steading-$VERSION-win-x64"
+          usd="/c/openusd/${OPENUSD_KEY}"
+          mkdir -p "$dir"
+          cp build/Release/steading.exe "$dir/steading.exe"
+          cp -r content mods "$dir/"
+          cp -r "$usd/lib" "$dir/lib"
+          rm -rf "$dir/lib/cmake" "$dir/lib/pkgconfig"
+          rm -f "$dir"/lib/*.lib
+          if [ -d "$usd/bin" ]; then cp -r "$usd/bin" "$dir/bin"; else mkdir -p "$dir/bin"; fi
+          if [ -d "$usd/plugin" ]; then cp -r "$usd/plugin" "$dir/plugin"; fi
+          cp -r "$usd/share/licenses" "$dir/licenses"
+          vs="$("/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe" -latest -products '*' \
+                -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)"
+          crt="$(ls -d "$(cygpath -u "$vs")"/VC/Redist/MSVC/*/x64/Microsoft.VC143.CRT | tail -n1)"
+          cp "$crt"/*.dll "$dir/"
+          cp LICENSE "$dir/LICENSE.txt"
+          cp docs/THIRD-PARTY.md "$dir/THIRD-PARTY.md"
+          cp docs/README-download.txt "$dir/README.txt"
+          printf '%s\r\n' '@echo off' \
+            'rem Starts steading with the content and libraries in this folder.' \
+            'set "PATH=%~dp0lib;%~dp0bin;%PATH%"' \
+            '"%~dp0steading.exe" --game-dir "%~dp0." %*' > "$dir/steading.bat"
+          ls -la "$dir"
+
+      # The runner cannot draw (no OpenGL 4.5 and no headless surface on
+      # Windows). What is checked is that the packaged executable starts from
+      # the launcher with only the download's DLLs on PATH: an unknown argument
+      # makes it print its usage and exit 2 after every DLL has loaded.
+      - name: The packaged executable starts with only the download's DLLs
+        shell: pwsh
+        run: |
+          $bat = (Resolve-Path "dist\Steading-$env:VERSION-win-x64\steading.bat").Path
+          $env:PATH = "C:\Windows\system32;C:\Windows"
+          $out = & cmd.exe /c "`"$bat`" --check-packaging 2>&1"
+          $code = $LASTEXITCODE
+          $out | Write-Host
+          Write-Host "steading.bat exited $code"
+          if ($code -ne 2 -or -not ($out -match 'usage: steading')) {
+            Write-Error "steading.exe did not start from the package (exit $code)."; exit 1
+          }
+          exit 0
+
+      - name: Archive
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist/Steading-$env:VERSION-win-x64" `
+            -DestinationPath "dist/Steading-$env:VERSION-win-x64.zip"
+          $hash = (Get-FileHash "dist/Steading-$env:VERSION-win-x64.zip" -Algorithm SHA256).Hash.ToLower()
+          "$hash  Steading-$env:VERSION-win-x64.zip" | Out-File -Encoding ascii -NoNewline "dist/Steading-$env:VERSION-win-x64.zip.sha256"
+          Get-ChildItem dist
+
+      - name: Upload the package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Steading-${{ env.VERSION }}-win-x64
+          path: |
+            dist/Steading-${{ env.VERSION }}-win-x64.zip
+            dist/Steading-${{ env.VERSION }}-win-x64.zip.sha256
+          if-no-files-found: error
+
+  attach:
+    name: Attach to the release
+    needs: [meta, linux, windows]
+    if: needs.meta.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.meta.outputs.tag }}
+    steps:
+      - name: Download the packages
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      # A tag pushed on its own has no release yet; one is made as a
+      # pre-release. A release made with GITHUB_TOKEN does not start this
+      # workflow again.
+      - name: Make sure the release exists
+        run: |
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --prerelease --generate-notes --title "steading $TAG"
+          fi
+
+      - name: Upload to the release
+        run: |
+          ls -l dist
+          gh release upload "$TAG" dist/* --clobber

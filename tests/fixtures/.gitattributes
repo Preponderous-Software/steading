@@ -1,0 +1,3 @@
+# Saves are compared byte for byte (the slot's HEAD carries a checksum):
+# never convert line endings in them.
+* -text

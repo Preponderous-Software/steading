@@ -136,6 +136,12 @@ saves nothing. CI checks the slot's files are byte-identical afterwards and that
 fresh run of the same seed tick for tick. The writer is usd-recorder's dependency-free header, vendored in
 `third_party/usd_recorder/`, so the replay needs no OpenUSD; the save format is unchanged.
 
+## Releases
+
+A bare version tag (`0.1.0`) builds Linux x64 and Windows x64 downloads, each with a `.sha256`
+([docs/RELEASING.md](docs/RELEASING.md)). Save slots written by the game are kept in
+[tests/fixtures](tests/fixtures/README.md) and must keep loading in every release.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
