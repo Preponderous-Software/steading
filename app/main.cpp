@@ -212,7 +212,10 @@ int main(int argc, char** argv) {
 
     help();
     status(*session);
-    using Clock = std::chrono::steady_clock;
+    // A test harness driving the game (Strata's STRATA_DRIVE) never writes
+    // the slot: no autosave, no F5, no save at the end or on exit.
+    const bool driven = engine->driven();
+    if (driven) std::printf("driven by a test harness: this run does not save\n");
     bool paused = false, running = true, dragging = false, looking = false;
     // A won colony pauses once; Space carries on (a reloaded won save asks again).
     bool keepPlaying = false;
@@ -230,9 +233,12 @@ int main(int argc, char** argv) {
     if (outcome(session->colony()) == Outcome::Won) announceWin();
     int speed = 1, dragX = 0, dragY = 0;
     double acc = 0;
-    auto last = Clock::now();
     std::future<strata::save::SaveResult> pending;
     auto startSave = [&](const char* why) {
+        if (driven) {
+            std::printf("not saved (%s): a test harness is driving this run\n", why);
+            return;
+        }
         if (pending.valid()) return;  // one at a time
         pending = session->saveAsync();
         std::printf("saving (%s)...\n", why);
@@ -309,10 +315,9 @@ int main(int argc, char** argv) {
                 dragging = false;
             }
         }
-        const auto now = Clock::now();
-        const double elapsed = std::chrono::duration<double>(now - last).count();
+        // The engine's frame clock: measured, or a harness's fixed step.
+        const double elapsed = engine->frameSeconds();
         acc += elapsed;
-        last = now;
         if (flying) {
             // Real-time, so the camera still moves while the colony is paused.
             const float boost = held[kLShift] || held[kRShift] ? 3.0f : 1.0f;
@@ -353,6 +358,7 @@ int main(int argc, char** argv) {
     }
     if (pending.valid()) pending.wait();
     pollSave();
+    if (driven) return 0;
     auto r = session->save();
     std::printf("%s\n", r.ok ? "saved on exit" : ("SAVE ON EXIT FAILED: " + r.error).c_str());
     return r.ok ? 0 : 1;

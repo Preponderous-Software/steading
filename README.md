@@ -51,6 +51,12 @@ too):
 The game autosaves every 500 ticks off the main thread. Saves live in a slot directory (`--slot DIR`, default
 `saves/default`).
 
+A test harness can play the game headless through Strata's drive channel (`STRATA_DRIVE`; Strata
+`docs/DRIVE.md`, playtester's `steading-strata` profile). A driven run never autosaves, saves on F5, at the
+end of a game or on exit; the only thing it writes is a brand-new colony's slot when it starts one with
+`--new` (which refuses a slot that already holds a game), and the frame time comes from
+`engine.frameSeconds()`, so a stepped harness gets the same frames on every run.
+
 ```sh
 steading --new 42                       # a new colony from seed 42
 steading                                # continue the last save
