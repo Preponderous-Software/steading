@@ -75,7 +75,11 @@ int main(int argc, char** argv) {
         if (!s) continue;
         auto l = s->load();
         CHECK_MSG(l.ok, l.error);
-        CHECK_MSG(!l.usedFallback && !l.migrated && l.warnings.empty(), "the latest save itself must load, unmigrated");
+        std::string notes;
+        for (const auto& w : l.warnings) notes += " warning: " + w;
+        for (const auto& r : l.rejected) notes += " rejected: " + r;
+        CHECK_MSG(!l.usedFallback && !l.migrated && l.warnings.empty(),
+                  std::string(x.name) + ": the latest save itself must load, unmigrated;" + notes);
         const Colony& c = s->colony();
         CHECK(c.globals.tick == x.tick);
         CHECK(c.globals.seed == static_cast<int64_t>(x.seed));

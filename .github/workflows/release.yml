@@ -279,10 +279,11 @@ jobs:
       - name: The packaged executable starts with only the download's DLLs
         shell: pwsh
         run: |
-          $dir = "dist/Steading-$env:VERSION-win-x64"
+          $bat = (Resolve-Path "dist\Steading-$env:VERSION-win-x64\steading.bat").Path
           $env:PATH = "C:\Windows\system32;C:\Windows"
-          & cmd.exe /c "$dir\steading.bat" --check-packaging 2>&1 | Tee-Object -Variable out
+          $out = & cmd.exe /c "`"$bat`" --check-packaging 2>&1"
           $code = $LASTEXITCODE
+          $out | Write-Host
           if ($code -ne 2 -or -not ($out -match 'usage: steading')) {
             Write-Error "steading.exe did not start from the package (exit $code)."; exit 1
           }
