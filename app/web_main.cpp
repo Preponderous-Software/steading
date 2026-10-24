@@ -21,6 +21,7 @@
 // faster).
 #include <algorithm>
 #include <cinttypes>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -262,6 +263,23 @@ EMSCRIPTEN_KEEPALIVE void steading_resize(double cssW, double cssH) {
     g->engine->resize(static_cast<int32_t>(cssW), static_cast<int32_t>(cssH));
     g->engine->drawableSize(g->w, g->h);
     g->view = app::fitMap(g->colony, aspect());
+}
+// The page's ?bench mode flies the free camera along a fixed path round the
+// map: looking along `yawRad` (0 looks north, towards -Z), `pitchRad` below
+// the horizon, from the map view's height times `distanceScale` away from the
+// map's centre. Absolute, so the path is the same whatever the frame rate.
+EMSCRIPTEN_KEEPALIVE void steading_bench_view(double yawRad, double pitchRad, double distanceScale) {
+    if (!g || !(distanceScale > 0)) return;
+    g->flying = true;
+    g->dragging = g->looking = false;
+    app::FlyView& f = g->fly;
+    f.yaw = static_cast<float>(yawRad);
+    f.pitch = -static_cast<float>(std::fabs(pitchRad));
+    const float r = g->view.height * static_cast<float>(distanceScale);
+    const float cp = std::cos(f.pitch);
+    f.eye[0] = g->view.centreX - r * std::sin(f.yaw) * cp;  // r behind the centre, along the view
+    f.eye[1] = std::max(0.5f, -r * std::sin(f.pitch));
+    f.eye[2] = g->view.centreZ + r * std::cos(f.yaw) * cp;
 }
 // Run the colony headlessly for `ticks` ticks (no rendering); used by the
 // smoke test to push the visible colony forward without waiting.

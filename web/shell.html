@@ -122,10 +122,14 @@
   <div class="row"><button id="helpClose">Play</button></div>
 </div>
 
+<!-- ?bench: a scripted frame-rate run (web/bench.js); it must load before the engine. -->
+<script src="bench.js"></script>
 <script>
 (function () {
   var params = new URLSearchParams(location.search);
   var seed = params.get('seed');
+  // ?bench: always the same colony, so runs on different devices are comparable.
+  if (window.StrataBench && StrataBench.requested && !seed) seed = '42';
   if (!/^\d{1,15}$/.test(seed || '')) seed = String(Math.floor(Math.random() * 1e9));
   var $ = function (id) { return document.getElementById(id); };
   var ready = false, lastOutcome = 'playing', bannerShown = false;
@@ -231,7 +235,8 @@
         resize: api('steading_resize', null, ['number', 'number']),
         advance: api('steading_advance', null, ['number']),
         fingerprint: api('steading_fingerprint', 'string', ['number', 'number']),
-        status: api('steading_status', 'string')
+        status: api('steading_status', 'string'),
+        benchView: api('steading_bench_view', null, ['number', 'number', 'number'])
       };
       window.steading = call;  // for the smoke test and the curious
       ready = true;
@@ -239,6 +244,16 @@
       wire();
       sizeCanvas();
       refresh();
+      if (window.StrataBench && StrataBench.requested) {
+        // The free camera turns once around the map, dipping lower and closer
+        // halfway; the colony runs at its usual speed.
+        StrataBench.run({
+          name: 'steading', scene: 'colony seed ' + seed + ', one orbit', canvas: $('canvas'),
+          path: function (u) {
+            call.benchView(2 * Math.PI * u, 0.75 - 0.25 * Math.sin(Math.PI * u), 1.1 - 0.35 * Math.sin(Math.PI * u));
+          }
+        });
+      }
     },
     onRendererFailed: function (why) {
       $('loading').textContent = 'steading needs WebGL 2, which this browser did not provide (' + why + ').';

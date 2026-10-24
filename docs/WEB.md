@@ -46,10 +46,21 @@ cd build-web && python3 -m http.server 8000      # open http://localhost:8000/st
 commit. The page is `steading.html` + `steading.js` + `steading.wasm` (about 1.2 MB); the shell is
 `web/shell.html`.
 
+## Measuring the frame rate
+
+Open the page with `?bench` (<https://steading.play.danielstephenson.dev/?bench>) on the device to measure. It
+starts colony seed 42 (or `?seed=N`), and the free camera turns once around the map, dipping lower and closer
+halfway, for 15 seconds after a short warm-up while the colony runs. Then it shows the frame rate, the frame time
+(median and p95), the page's own work per frame, the GPU time where the browser offers WebGL 2 timer queries, the
+canvas size and device pixel ratio and the GPU's name, with a button that copies it all as text. `?bench=30` runs
+for 30 seconds. Nothing is sent anywhere. `web/bench.js` is the harness and `steading_bench_view` puts the camera on
+the path (absolute in time, so runs on different devices are comparable).
+
 ## CI and deployment
 
 `.github/workflows/browser.yml` builds the page, runs the rules tests under Node, and smoke-tests the page in
 headless Chromium (SwiftShader) on a desktop viewport and the iPhone 13 profile with `web/smoke/smoke.cjs`. The
 smoke test checks the fingerprint, that the canvas draws, a mouse drag, a touch tap and the buttons, then uploads
-the screenshots. When the repository variable `ARCADE_ENABLED` is `true`, a push to `main` deploys the page to
+the screenshots. `web/smoke/bench.cjs` checks that a short `?bench` run finishes and shows its card on both
+profiles (it keeps no numbers: SwiftShader draws on the CPU). When the repository variable `ARCADE_ENABLED` is `true`, a push to `main` deploys the page to
 arcade with `Stephenson-Software/arcade-deploy` and the `ARCADE_TOKEN` secret.
