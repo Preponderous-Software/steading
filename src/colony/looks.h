@@ -16,15 +16,9 @@ struct Looks {
     float treeWinter[3] = {0.85f, 0.9f, 0.95f};
 };
 
-// What the core content (no mods) actually composes to through USD today, for
-// a build without USD (the browser build). It differs from the authored
-// defaults in one place: winter trees keep their summer colour, because the
-// winter colour is a variant opinion, weaker than the local one on the Tree's
-// Geom (issue #7). tests/test_core_defaults.cpp checks this against the USD read.
-inline Looks coreLooks() {
-    Looks l;
-    for (int i = 0; i < 3; ++i) l.treeWinter[i] = l.treeSummer[i];
-    return l;
-}
+// What the core content (no mods) composes to through USD, for a build without
+// USD (the browser build): the authored defaults above.
+// tests/test_core_defaults.cpp checks this against the USD read.
+inline Looks coreLooks() { return Looks{}; }
 
 }  // namespace steading

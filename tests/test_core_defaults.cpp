@@ -44,5 +44,13 @@ int main(int argc, char** argv) {
         CHECK(same3(r.treeSummer, l.treeSummer));
         CHECK(same3(r.treeWinter, l.treeWinter));
     }
+
+    SECTION("the winter variant repaints trees (a local colour on the Geom would outvote it)");
+    if (s) {
+        const Looks d;
+        CHECK(same3(s->looks().treeSummer, d.treeSummer));
+        CHECK(same3(s->looks().treeWinter, d.treeWinter));
+        CHECK(!same3(s->looks().treeSummer, s->looks().treeWinter));
+    }
     return check::finish();
 }

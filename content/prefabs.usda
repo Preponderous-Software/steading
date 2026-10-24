@@ -70,11 +70,16 @@ def Scope "Prefabs"
             uniform token axis = "Z"
             float3 xformOp:translate = (0, 0, 0.5)
             uniform token[] xformOpOrder = ["xformOp:translate"]
-            color3f[] primvars:displayColor = [(0.1, 0.45, 0.12)]
         }
+        # Each season authors its own colour: a colour on the def above would be
+        # a local opinion, stronger than either variant's, and win in winter too.
         variantSet "season" = {
             "summer" {
                 double colony:stats:regrowPerMille = 40
+                over "Geom"
+                {
+                    color3f[] primvars:displayColor = [(0.1, 0.45, 0.12)]
+                }
             }
             "winter" {
                 double colony:stats:regrowPerMille = 0
