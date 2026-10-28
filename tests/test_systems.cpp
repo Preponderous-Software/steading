@@ -1,3 +1,5 @@
+#include <stdexcept>
+
 #include "check.h"
 #include "colony/generate.h"
 #include "colony/systems.h"
@@ -149,6 +151,47 @@ int main() {
         g.population = 1;
         c.globals.tick = 0;
         CHECK(outcome(c, g) == Outcome::Won);
+    }
+    SECTION("components: remove is a stable erase that keeps every column aligned; ids must increase");
+    {
+        Colony c = tiny();
+        for (int32_t i = 0; i < 3; ++i) {
+            const size_t row = c.settlers.add(10 + i, i, 2 * i);
+            CHECK(row == static_cast<size_t>(i));
+            c.settlers.task[row] = 1 + i;
+            c.settlers.tx[row] = 20 + i;
+            c.settlers.ty[row] = 30 + i;
+            c.settlers.carry[row] = 40 + i;
+            c.settlers.carryType[row] = 50 + i;
+            c.settlers.hunger[row] = 60 + i;
+            c.settlers.patience[row] = 70 + i;
+        }
+        c.settlers.remove(1);
+        const Settlers& s = c.settlers;
+        CHECK(s.size() == 2 && s.id[0] == 10 && s.id[1] == 12);
+        for (const auto* col : {&s.x, &s.y, &s.task, &s.tx, &s.ty, &s.carry, &s.carryType, &s.hunger, &s.patience})
+            CHECK(col->size() == 2);
+        CHECK(s.x[1] == 2 && s.y[1] == 4 && s.task[1] == 3 && s.tx[1] == 22 && s.ty[1] == 32);
+        CHECK(s.carry[1] == 42 && s.carryType[1] == 52 && s.hunger[1] == 62 && s.patience[1] == 72);
+        CHECK(s.x[0] == 0 && s.patience[0] == 70);
+
+        bool threw = false;
+        try { c.settlers.add(12, 0, 0); } catch (const std::logic_error&) { threw = true; }
+        CHECK_MSG(threw, "a settler id not above every existing id is refused");
+        CHECK(c.settlers.size() == 2);
+
+        c.buildings.add(5, BuildingKind::Hut, 1, 2, 7);
+        c.buildings.add(6, BuildingKind::HutPlan, 3, 4, 8);
+        c.buildings.remove(0);  // the stockpile from tiny()
+        const Buildings& b = c.buildings;
+        CHECK(b.size() == 2 && b.id[0] == 5 && b.id[1] == 6);
+        CHECK(b.kind.size() == 2 && b.x.size() == 2 && b.y.size() == 2 && b.builtTick.size() == 2);
+        CHECK(b.kind[1] == static_cast<int32_t>(BuildingKind::HutPlan) && b.x[1] == 3 && b.y[1] == 4 &&
+              b.builtTick[1] == 8);
+        threw = false;
+        try { c.buildings.add(6, BuildingKind::Hut, 0, 0, 0); } catch (const std::logic_error&) { threw = true; }
+        CHECK_MSG(threw, "a building id not above every existing id is refused");
+        CHECK(c.buildings.size() == 2);
     }
     SECTION("view projects settlers, buildings and live trees");
     {
