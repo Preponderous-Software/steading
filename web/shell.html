@@ -9,6 +9,8 @@
   :root {
     --bg: #10140f; --panel: rgba(16, 20, 15, 0.86); --line: #2f3a2c; --text: #e9eadf; --dim: #a9b0a0;
     --accent: #e2c84a; --warn: #f0a35e; --btn: #232b20; --btn-on: #4a5a2c;
+    /* The loading shell (web/strata-kit/strata-loader.js) in the page's colours. */
+    --sk-loader-bg: var(--bg); --sk-loader-fg: var(--text); --sk-loader-panel: var(--panel); --sk-loader-accent: var(--accent);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
@@ -98,7 +100,7 @@
   <span></span><span></span><button data-key="20" aria-label="Down">Dn</button>
 </div>
 
-<div id="loading">Loading steading&hellip;</div>
+<div id="loading" style="display: none"></div>
 
 <div id="banner" role="dialog" aria-labelledby="bannerTitle">
   <h2 id="bannerTitle">The colony made it!</h2>
@@ -241,6 +243,7 @@
       window.steading = call;  // for the smoke test and the curious
       ready = true;
       $('loading').style.display = 'none';
+      StrataBoot.ready();
       wire();
       sizeCanvas();
       refresh();
@@ -257,6 +260,7 @@
     },
     onRendererFailed: function (why) {
       $('loading').textContent = 'steading needs WebGL 2, which this browser did not provide (' + why + ').';
+      StrataLoader.fallback('engine', 'steading needs WebGL 2, which this browser did not provide (' + why + ').');
     },
     onAbort: function (what) {
       $('loading').style.display = 'block';
@@ -265,6 +269,27 @@
   };
 })();
 </script>
-{{{ SCRIPT }}}
+<!-- emcc's script tag, kept inert: web/strata-boot.js starts it behind the
+     loading shell. data-bytes is the download's size, stamped by the build. -->
+<template id="strata-glue" data-bytes="0">{{{ SCRIPT }}}</template>
+<!-- The loading shell, vendored from Strata, and its bridge to this build; the
+     build puts both inline (web/strata_page.cmake). -->
+<script src="strata-kit/strata-loader.js"></script>
+<script src="strata-boot.js"></script>
+<script>
+  // The loading shell: the trailer's first frame behind real progress, and the
+  // trailer itself, with the reason, if the game can't run here. The media are
+  // the game's /play trailer.
+  StrataBoot.start({
+    wasm: 'steading.wasm',
+    title: 'steading',
+    poster: 'https://danielstephenson.dev/trailers/steading.jpg',
+    posterAlt: 'steading: a colony seen from above',
+    trailer: { webm: 'https://danielstephenson.dev/trailers/steading.webm', mp4: 'https://danielstephenson.dev/trailers/steading.mp4' },
+    trailerLabel: 'A recorded clip of steading',
+    fallback: { href: 'https://danielstephenson.dev/play', text: 'More games' },
+    canvas: document.getElementById('canvas')
+  }).catch(function () {});  // the loading shell already shows why
+</script>
 </body>
 </html>
