@@ -181,6 +181,16 @@ if(STEADING_WEB)
     -sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString
     "--shell-file=${CMAKE_CURRENT_SOURCE_DIR}/web/shell.html")
   set_property(TARGET steading-web APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/web/shell.html")
+  # The loading shell (web/strata-kit, vendored from Strata) and its bridge go
+  # inline into the page, with the download's size (web/strata_page.cmake).
+  set_property(TARGET steading-web APPEND PROPERTY LINK_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/web/strata-kit/strata-loader.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/web/strata-boot.js")
+  add_custom_command(TARGET steading-web POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" "-DHTML=$<TARGET_FILE:steading-web>"
+            "-DWASM=$<TARGET_FILE_DIR:steading-web>/$<TARGET_FILE_BASE_NAME:steading-web>.wasm"
+            "-DWEB=${CMAKE_CURRENT_SOURCE_DIR}/web" -P "${CMAKE_CURRENT_SOURCE_DIR}/web/strata_page.cmake"
+    VERBATIM)
   # The page's ?bench mode (web/bench.js) is served next to it.
   configure_file(web/bench.js "${CMAKE_CURRENT_BINARY_DIR}/bench.js" COPYONLY)
 endif()
