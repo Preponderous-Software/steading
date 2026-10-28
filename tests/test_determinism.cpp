@@ -132,11 +132,11 @@ int main() {
             {"grid size", [](Colony& col) { col.grid.w += 1; }},
             {"season", [](Colony& col) { col.season = Season::Winter; }},
         };
-        // A field added to the schema without a case here fails these counts.
-        CHECK(std::size(grid) == std::size(schema::kGridChannels));
-        CHECK(std::size(settlers) == std::size(schema::kSettlerFields));
-        CHECK(std::size(buildings) == std::size(schema::kBuildingFields));
-        CHECK(std::size(globals) == std::size(schema::kGlobals));
+        // A field added to the schema without a case here fails to compile.
+        static_assert(sizeof grid / sizeof grid[0] == std::size(schema::kGridChannels), "grid channel cases");
+        static_assert(sizeof settlers / sizeof settlers[0] == std::size(schema::kSettlerFields), "settler cases");
+        static_assert(sizeof buildings / sizeof buildings[0] == std::size(schema::kBuildingFields), "building cases");
+        static_assert(sizeof globals / sizeof globals[0] == std::size(schema::kGlobals), "global cases");
         CHECK(a.season == Season::Summer && a.settlers.size() > 0 && a.buildings.size() > 0);
         CHECK(equal(a, a) && fingerprint(Colony(a)) == fp);
         auto expect = [&](const Edit& e) {
