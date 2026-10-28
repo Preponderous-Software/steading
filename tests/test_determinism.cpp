@@ -4,9 +4,13 @@
 // simulating identically to the original.
 #include <cinttypes>
 #include <cstdio>
+#include <cstring>
+#include <iterator>
+#include <string>
 
 #include "check.h"
 #include "colony/generate.h"
+#include "colony/schema.h"
 #include "colony/systems.h"
 
 using namespace steading;
@@ -72,6 +76,85 @@ int main() {
         }
         std::string why;
         CHECK_MSG(equal(a, b, &why), why);
+    }
+    SECTION("equal() and fingerprint() see every saved field");
+    {
+        // The save round trip and the soak above are only as strong as equal() and
+        // fingerprint(): a field either one skips would be dropped by a save without a
+        // check noticing. Change each saved field on its own and require both to see it.
+        const Colony a = generate(GenParams{});
+        const uint64_t fp = fingerprint(a);
+        struct Edit {
+            const char* field;
+            void (*apply)(Colony&);
+        };
+        const Edit grid[] = {
+            {"grid.terrain", [](Colony& col) { col.grid.terrain[0] += 1; }},
+            {"grid.resType", [](Colony& col) { col.grid.resType[0] += 1; }},
+            {"grid.resAmount", [](Colony& col) { col.grid.resAmount[0] += 1; }},
+            {"grid.designated", [](Colony& col) { col.grid.designated[0] += 1; }},
+        };
+        const Edit settlers[] = {
+            {"settlers.x", [](Colony& col) { col.settlers.x[0] += 1; }},
+            {"settlers.y", [](Colony& col) { col.settlers.y[0] += 1; }},
+            {"settlers.task", [](Colony& col) { col.settlers.task[0] += 1; }},
+            {"settlers.tx", [](Colony& col) { col.settlers.tx[0] += 1; }},
+            {"settlers.ty", [](Colony& col) { col.settlers.ty[0] += 1; }},
+            {"settlers.carry", [](Colony& col) { col.settlers.carry[0] += 1; }},
+            {"settlers.carryType", [](Colony& col) { col.settlers.carryType[0] += 1; }},
+            {"settlers.hunger", [](Colony& col) { col.settlers.hunger[0] += 1; }},
+            {"settlers.patience", [](Colony& col) { col.settlers.patience[0] += 1; }},
+        };
+        const Edit buildings[] = {
+            {"buildings.x", [](Colony& col) { col.buildings.x[0] += 1; }},
+            {"buildings.y", [](Colony& col) { col.buildings.y[0] += 1; }},
+            {"buildings.builtTick", [](Colony& col) { col.buildings.builtTick[0] += 1; }},
+        };
+        const Edit globals[] = {
+            {"globals.tick", [](Colony& col) { col.globals.tick += 1; }},
+            {"globals.rng", [](Colony& col) { col.globals.rng += 1; }},
+            {"globals.wood", [](Colony& col) { col.globals.wood += 1; }},
+            {"globals.stone", [](Colony& col) { col.globals.stone += 1; }},
+            {"globals.food", [](Colony& col) { col.globals.food += 1; }},
+            {"globals.stockX", [](Colony& col) { col.globals.stockX += 1; }},
+            {"globals.stockY", [](Colony& col) { col.globals.stockY += 1; }},
+            {"globals.maxSettlers", [](Colony& col) { col.globals.maxSettlers += 1; }},
+            {"globals.nextSettlerId", [](Colony& col) { col.globals.nextSettlerId += 1; }},
+            {"globals.nextBuildingId", [](Colony& col) { col.globals.nextBuildingId += 1; }},
+            {"globals.seed", [](Colony& col) { col.globals.seed += 1; }},
+        };
+        // Fields with no per-column schema name: entity ids (the prim names), the
+        // building kind (the prefab it references), the grid size and the season.
+        const Edit other[] = {
+            {"settlers.id", [](Colony& col) { col.settlers.id.back() += 1; }},
+            {"buildings.id", [](Colony& col) { col.buildings.id.back() += 1; }},
+            {"buildings.kind", [](Colony& col) { col.buildings.kind[0] += 1; }},
+            {"grid size", [](Colony& col) { col.grid.w += 1; }},
+            {"season", [](Colony& col) { col.season = Season::Winter; }},
+        };
+        // A field added to the schema without a case here fails to compile.
+        static_assert(sizeof grid / sizeof grid[0] == std::size(schema::kGridChannels), "grid channel cases");
+        static_assert(sizeof settlers / sizeof settlers[0] == std::size(schema::kSettlerFields), "settler cases");
+        static_assert(sizeof buildings / sizeof buildings[0] == std::size(schema::kBuildingFields), "building cases");
+        static_assert(sizeof globals / sizeof globals[0] == std::size(schema::kGlobals), "global cases");
+        CHECK(a.season == Season::Summer && a.settlers.size() > 0 && a.buildings.size() > 0);
+        CHECK(equal(a, a) && fingerprint(Colony(a)) == fp);
+        auto expect = [&](const Edit& e) {
+            Colony b = a;
+            e.apply(b);
+            std::string why;
+            const bool same = equal(a, b, &why);
+            const size_t n = std::strlen(e.field);
+            const bool named = why.compare(0, n, e.field) == 0 && (why.size() == n || why[n] == '[');
+            CHECK_MSG(!same, std::string("equal() misses ") + e.field);
+            CHECK_MSG(named, std::string("equal() names '") + why + "' for " + e.field);
+            CHECK_MSG(fingerprint(b) != fp, std::string("fingerprint() misses ") + e.field);
+        };
+        for (const Edit& e : grid) expect(e);
+        for (const Edit& e : settlers) expect(e);
+        for (const Edit& e : buildings) expect(e);
+        for (const Edit& e : globals) expect(e);
+        for (const Edit& e : other) expect(e);
     }
     SECTION("pinned fingerprint: seed 42, 64x64, 30 settlers, 1000 ticks");
     {
