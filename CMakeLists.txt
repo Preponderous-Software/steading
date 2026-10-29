@@ -12,9 +12,9 @@ option(STEADING_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(STEADING_BUILD_TESTS "Build the test suite" ON)
 option(STEADING_WITH_STRATA "Build the playable game and save integration on the Strata engine (needs OpenUSD)" OFF)
 option(STEADING_WEB "Build the browser game (Emscripten + Strata's WebGL 2 backend; no OpenUSD, no saves)" OFF)
-# The Strata commit the game is built against (the v0.6.0 tag; strata.ref
+# The Strata commit the game is built against (the v0.7.0 tag; strata.ref
 # carries the same SHA for CI). Pinned; bump deliberately.
-set(STEADING_STRATA_REF "c2d7ee4c1102726c654c90d8361383d9ba3590b3" CACHE STRING "Strata git ref (a full commit SHA in CI)")
+set(STEADING_STRATA_REF "20827c3d67e71c1f942c29e7cf8adfa4801188a8" CACHE STRING "Strata git ref (a full commit SHA in CI)")
 
 # Emscripten: the rules, tools and tests build as they are and the tests run
 # under Node; STEADING_WEB adds the browser game. Strata compiles C++
