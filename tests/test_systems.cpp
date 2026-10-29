@@ -206,5 +206,30 @@ int main() {
         CHECK(v[1].path == "Buildings/B_000000" && v[1].prefab == "/Prefabs/Stockpile");
         CHECK(v[2].path == "Trees/T_001_001" && v[2].scale == 1.0f);
     }
+    SECTION("prefab paths and prim names are pinned (a building's kind is saved as its prefab path)");
+    {
+        CHECK(std::string(prefabFor(BuildingKind::Stockpile)) == "/Prefabs/Stockpile");
+        CHECK(std::string(prefabFor(BuildingKind::Hut)) == "/Prefabs/Hut");
+        CHECK(std::string(prefabFor(BuildingKind::HutPlan)) == "/Prefabs/HutPlan");
+        CHECK_MSG(std::string(prefabFor(static_cast<BuildingKind>(99))) == "/Prefabs/Unknown",
+                  "an out-of-range kind maps to no real prefab");
+        CHECK(primName("S_", 0) == "S_000000");
+        CHECK(primName("B_", 42) == "B_000042");
+        CHECK_MSG(primName("S_", 1234567) == "S_1234567", "ids past six digits widen, never truncate");
+
+        Colony c = tiny();
+        c.buildings.add(c.globals.nextBuildingId++, BuildingKind::Hut, 2, 3, 0);
+        c.buildings.add(c.globals.nextBuildingId++, BuildingKind::HutPlan, 4, 5, 0);
+        c.grid.resType[c.grid.at(7, 8)] = static_cast<int32_t>(Resource::Tree);
+        c.grid.resAmount[c.grid.at(7, 8)] = 4;
+        c.grid.resType[c.grid.at(8, 8)] = static_cast<int32_t>(Resource::Stone);  // not a tree: not drawn
+        c.grid.resAmount[c.grid.at(8, 8)] = 5;
+        auto v = view(c);
+        CHECK(v.size() == 4);
+        CHECK(v[1].path == "Buildings/B_000001" && v[1].prefab == "/Prefabs/Hut" && v[1].x == 2.5f &&
+              v[1].y == 3.5f);
+        CHECK(v[2].path == "Buildings/B_000002" && v[2].prefab == "/Prefabs/HutPlan");
+        CHECK(v[3].path == "Trees/T_007_008" && v[3].prefab == "/Prefabs/Tree" && v[3].scale == 0.5f + 0.05f * 4.f);
+    }
     return check::finish();
 }
