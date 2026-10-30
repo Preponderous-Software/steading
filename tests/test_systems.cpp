@@ -231,5 +231,146 @@ int main() {
         CHECK(v[2].path == "Buildings/B_000002" && v[2].prefab == "/Prefabs/HutPlan");
         CHECK(v[3].path == "Trees/T_007_008" && v[3].prefab == "/Prefabs/Tree" && v[3].scale == 0.5f + 0.05f * 4.f);
     }
+    SECTION("tasks: a returning settler delivers stone and berries to their own stocks");
+    {
+        Colony c = tiny();
+        Rng rng{1};
+        const size_t i = c.settlers.add(c.globals.nextSettlerId++, 6, 6);  // standing on the stockpile
+        c.settlers.task[i] = static_cast<int32_t>(Task::Return);
+        c.settlers.carry[i] = 3;
+        c.settlers.carryType[i] = static_cast<int32_t>(Resource::Stone);
+        c.settlers.patience[i] = 7;
+        systems::tasks(c, Stats{}, rng);
+        CHECK(c.globals.stone == 3 && c.globals.wood == 0 && c.globals.food == 0);
+        CHECK(c.settlers.carry[i] == 0 && c.settlers.carryType[i] == 0);
+        CHECK(c.settlers.task[i] == static_cast<int32_t>(Task::Idle) && c.settlers.patience[i] == 0);
+        c.settlers.task[i] = static_cast<int32_t>(Task::Return);
+        c.settlers.carry[i] = 4;
+        c.settlers.carryType[i] = static_cast<int32_t>(Resource::Berry);
+        systems::tasks(c, Stats{}, rng);
+        CHECK(c.globals.food == 4 && c.globals.stone == 3 && c.settlers.carry[i] == 0);
+    }
+    SECTION("tasks: gathering stops at the carry limit, or goes idle on an empty tile with nothing carried");
+    {
+        Colony c = tiny();
+        Rng rng{1};
+        const size_t k = c.grid.at(7, 6);
+        c.grid.resType[k] = static_cast<int32_t>(Resource::Tree);
+        c.grid.resAmount[k] = Rules::kCarryMax + 2;
+        const size_t i = c.settlers.add(c.globals.nextSettlerId++, 7, 6);
+        c.settlers.task[i] = static_cast<int32_t>(Task::Gather);
+        c.settlers.tx[i] = 7;
+        c.settlers.ty[i] = 6;
+        for (int n = 0; n < Rules::kCarryMax; ++n) systems::tasks(c, Stats{}, rng);
+        CHECK(c.settlers.carry[i] == Rules::kCarryMax && c.grid.resAmount[k] == 2);
+        CHECK(c.settlers.carryType[i] == static_cast<int32_t>(Resource::Tree));
+        CHECK(c.settlers.task[i] == static_cast<int32_t>(Task::Gather));
+        systems::tasks(c, Stats{}, rng);
+        CHECK_MSG(c.settlers.task[i] == static_cast<int32_t>(Task::Return), "a full settler heads home");
+        CHECK(c.grid.resAmount[k] == 2);
+
+        c.grid.resAmount[k] = 0;
+        c.settlers.carry[i] = 0;
+        c.settlers.task[i] = static_cast<int32_t>(Task::Gather);
+        systems::tasks(c, Stats{}, rng);
+        CHECK_MSG(c.settlers.task[i] == static_cast<int32_t>(Task::Idle), "nothing to gather, nothing carried");
+    }
+    SECTION("tasks: patience runs out en route, then a wandering cooldown");
+    {
+        Colony c = tiny();
+        Rng rng{1};
+        const size_t i = c.settlers.add(c.globals.nextSettlerId++, 0, 0);
+        c.settlers.task[i] = static_cast<int32_t>(Task::ToResource);
+        c.settlers.tx[i] = 11;
+        c.settlers.ty[i] = 11;
+        c.settlers.patience[i] = Rules::kGiveUpToResource - 1;
+        systems::tasks(c, Stats{}, rng);
+        CHECK(c.settlers.task[i] == static_cast<int32_t>(Task::ToResource));
+        CHECK(c.settlers.patience[i] == Rules::kGiveUpToResource);
+        systems::tasks(c, Stats{}, rng);
+        CHECK_MSG(c.settlers.task[i] == static_cast<int32_t>(Task::Idle), "gives up after the limit");
+        CHECK(c.settlers.patience[i] == -Rules::kWanderCooldown);
+
+        // While cooling down an idle settler ignores resources; once it ends it picks one.
+        c.grid.resType[c.grid.at(9, 9)] = static_cast<int32_t>(Resource::Tree);
+        c.grid.resAmount[c.grid.at(9, 9)] = 5;
+        c.settlers.x[i] = 6;
+        c.settlers.y[i] = 6;
+        c.settlers.patience[i] = -1;
+        systems::tasks(c, Stats{}, rng);
+        CHECK(c.settlers.task[i] == static_cast<int32_t>(Task::Idle) && c.settlers.patience[i] == 0);
+        systems::tasks(c, Stats{}, rng);
+        CHECK(c.settlers.task[i] == static_cast<int32_t>(Task::ToResource));
+        CHECK(c.settlers.tx[i] == 9 && c.settlers.ty[i] == 9);
+    }
+    SECTION("tasks: arriving starts gathering; a returning settler that gives up keeps its load");
+    {
+        Colony c = tiny();
+        Rng rng{1};
+        const size_t i = c.settlers.add(c.globals.nextSettlerId++, 3, 3);
+        c.settlers.task[i] = static_cast<int32_t>(Task::ToResource);
+        c.settlers.tx[i] = 3;
+        c.settlers.ty[i] = 3;
+        c.settlers.patience[i] = 9;
+        systems::tasks(c, Stats{}, rng);
+        CHECK(c.settlers.task[i] == static_cast<int32_t>(Task::Gather) && c.settlers.patience[i] == 0);
+
+        c.settlers.task[i] = static_cast<int32_t>(Task::Return);
+        c.settlers.carry[i] = 2;
+        c.settlers.carryType[i] = static_cast<int32_t>(Resource::Tree);
+        c.settlers.patience[i] = Rules::kGiveUpReturning;
+        systems::tasks(c, Stats{}, rng);
+        CHECK(c.settlers.task[i] == static_cast<int32_t>(Task::Return));
+        CHECK(c.settlers.patience[i] == -Rules::kWanderCooldown && c.settlers.carry[i] == 2);
+        systems::tasks(c, Stats{}, rng);
+        CHECK(c.settlers.patience[i] == -Rules::kWanderCooldown + 1 && c.settlers.carry[i] == 2);
+        CHECK(c.globals.wood == 0);
+    }
+    SECTION("tasks: a starving settler is skipped");
+    {
+        Colony c = tiny();
+        Rng rng{1};
+        c.grid.resType[c.grid.at(7, 6)] = static_cast<int32_t>(Resource::Tree);
+        c.grid.resAmount[c.grid.at(7, 6)] = 5;
+        const size_t i = c.settlers.add(c.globals.nextSettlerId++, 5, 5);
+        c.settlers.hunger[i] = Rules::kStarveAt;
+        const uint64_t before = rng.state;
+        systems::tasks(c, Stats{}, rng);
+        CHECK(c.settlers.task[i] == static_cast<int32_t>(Task::Idle));
+        CHECK(c.settlers.x[i] == 5 && c.settlers.y[i] == 5);
+        CHECK_MSG(rng.state == before, "no random draw is spent on a dying settler");
+    }
+    SECTION("growth: births only on birth ticks, with enough food, under the colony's maxSettlers");
+    {
+        Colony c = tiny();
+        c.globals.food = 100;
+        c.globals.tick = Rules::kBirthEvery + 1;
+        systems::growth(c, Stats{});
+        CHECK(c.settlers.size() == 0 && c.globals.food == 100);
+        c.globals.tick = Rules::kBirthEvery;
+        c.globals.food = Rules::kBirthFood - 1;
+        systems::growth(c, Stats{});
+        CHECK(c.settlers.size() == 0);
+        c.globals.food = Rules::kBirthFood;
+        systems::growth(c, Stats{});
+        CHECK(c.settlers.size() == 1 && c.globals.food == 0);
+        CHECK(c.settlers.x[0] == 6 && c.settlers.y[0] == 6 && c.globals.nextSettlerId == 1);
+        c.globals.food = 100;
+        c.globals.maxSettlers = 1;  // below the housing cap of tiny()
+        systems::growth(c, Stats{});
+        CHECK_MSG(c.settlers.size() == 1 && c.globals.food == 100, "maxSettlers caps births");
+    }
+    SECTION("designate clamps a rectangle that runs off the map");
+    {
+        Colony c = tiny();
+        c.grid.resType[c.grid.at(0, 0)] = static_cast<int32_t>(Resource::Stone);
+        c.grid.resType[c.grid.at(11, 11)] = static_cast<int32_t>(Resource::Berry);
+        CHECK(designate(c, -5, -5, 100, 100, true) == 2);
+        CHECK(c.grid.designated[c.grid.at(0, 0)] == 1 && c.grid.designated[c.grid.at(11, 11)] == 1);
+        CHECK(c.grid.designated[c.grid.at(5, 5)] == 0);
+        CHECK(designate(c, 100, 100, -5, -5, true) == 0);  // already marked
+        CHECK(designate(c, 20, 20, 30, 30, false) == 0);   // wholly off the map
+        CHECK(designate(c, 11, 11, 50, 50, false) == 1);
+    }
     return check::finish();
 }
