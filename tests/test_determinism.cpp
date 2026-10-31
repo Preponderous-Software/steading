@@ -3,6 +3,7 @@
 // its derived caches rebuilt from scratch (as a load does), must keep
 // simulating identically to the original.
 #include <cinttypes>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <iterator>
@@ -10,6 +11,7 @@
 
 #include "check.h"
 #include "colony/generate.h"
+#include "colony/rng.h"
 #include "colony/schema.h"
 #include "colony/systems.h"
 
@@ -155,6 +157,54 @@ int main() {
         for (const Edit& e : buildings) expect(e);
         for (const Edit& e : globals) expect(e);
         for (const Edit& e : other) expect(e);
+    }
+    SECTION("rng: mix64, Rng and valueNoise are pinned and in range");
+    {
+        // Every world and every tick draws from these, so a change here moves
+        // all saves' futures. mix64 is the SplitMix64 finaliser: these are the
+        // published reference outputs for SplitMix64 seeded with 0.
+        CHECK(mix64(0) == UINT64_C(0xe220a8397b1dcdaf));
+        CHECK(mix64(UINT64_C(0x9e3779b97f4a7c15)) == UINT64_C(0x6e789e6aa1b965f4));
+
+        // The whole Rng state is one uint64_t (saved as Globals::rng): an LCG
+        // step, with mix64 applied to the output only.
+        Rng r{12345};
+        CHECK(r.next() == UINT64_C(0xe28de178a35c2c42) && r.state == UINT64_C(0x1c0d57f10c894254));
+        CHECK(r.next() == UINT64_C(0x68c46d70c61c1092) && r.state == UINT64_C(0x43f04a6ece53d613));
+        CHECK(r.next() == UINT64_C(0x566ad4001df2b13e) && r.state == UINT64_C(0xe2b8410510668fa6));
+        Rng copy{r.state};
+        CHECK(copy.next() == r.next());  // restoring the state resumes the same sequence
+
+        bool lo = false, hi = false, inRange = true, belowOk = true;
+        for (int i = 0; i < 2000; ++i) {
+            const int v = r.range(-3, 3);
+            inRange = inRange && v >= -3 && v <= 3;
+            lo = lo || v == -3;
+            hi = hi || v == 3;
+            const int b = r.below(7);
+            belowOk = belowOk && b >= 0 && b < 7;
+            belowOk = belowOk && r.below(1) == 0;
+        }
+        CHECK_MSG(inRange && lo && hi, "range() is inclusive at both ends");
+        CHECK(belowOk);
+
+        // On the integer lattice valueNoise is exactly the corner hash (53 bits
+        // scaled into [0, 1)), including negative cells; in between it blends.
+        const double scale = 9007199254740992.0;  // 2^53
+        CHECK(valueNoise(42, 3.0, 5.0) * scale == 8412913687174903.0);
+        CHECK(valueNoise(42, 4.0, 5.0) * scale == 5182047289156008.0);
+        CHECK(valueNoise(42, -2.0, -7.0) * scale == 6492508512279940.0);
+        CHECK(valueNoise(43, 3.0, 5.0) * scale == 2608104317372823.0);
+        const double c0 = valueNoise(42, 3.0, 5.0), c1 = valueNoise(42, 4.0, 5.0);
+        CHECK(valueNoise(42, 3.5, 5.0) == c0 + (c1 - c0) * 0.5);  // smoothstep(0.5) == 0.5
+        CHECK(std::fabs(valueNoise(42, 4.0 - 1e-9, 5.0) - c1) < 1e-6);  // continuous across a cell edge
+        bool unit = true;
+        for (int y = -20; y < 20; ++y)
+            for (int x = -20; x < 20; ++x) {
+                const double v = valueNoise(7, x * 0.37, y * 0.53);
+                unit = unit && v >= 0.0 && v < 1.0;
+            }
+        CHECK_MSG(unit, "valueNoise stays in [0, 1)");
     }
     SECTION("pinned fingerprint: seed 42, 64x64, 30 settlers, 1000 ticks");
     {
