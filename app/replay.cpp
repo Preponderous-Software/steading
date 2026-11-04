@@ -1,7 +1,7 @@
 // steading-replay: record a colony's history as a usd-replay/1 replay (.usda).
 //
-//   steading-replay --new SEED [--size N] [--settlers N] [--ticks N] [--every N] --out run.usda
-//   steading-replay --slot DIR [--game-dir DIR] [--mods a,b] [--ticks N] [--every N] --out run.usda
+//   steading-replay --new SEED [--size N] [--settlers N] [--ticks N] [--every N] [--version V] [--title T] --out run.usda
+//   steading-replay --slot DIR [--game-dir DIR] [--mods a,b] [--ticks N] [--every N] [--version V] [--title T] --out run.usda
 //
 // --new generates a colony from a seed (no save is involved). --slot (only in the Strata build)
 // starts from a save, READ-ONLY: the slot's files are copied to a temporary directory and the
@@ -38,7 +38,7 @@ namespace {
 int usage() {
     std::fprintf(stderr,
                  "usage: steading-replay (--new SEED [--size N] [--settlers N] | --slot DIR [--game-dir DIR] [--mods a,b])\n"
-                 "                       [--ticks N] [--every N] [--version V] --out run.usda\n");
+                 "                       [--ticks N] [--every N] [--version V] [--title T] --out run.usda\n");
     return 2;
 }
 

@@ -14,7 +14,7 @@
 //    page (web/shell.html) adds buttons for touch screens through the
 //    steading_* functions exported below.
 //
-// Keyboard and mouse are the desktop controls minus F5/F9/Esc: Space pause /
+// Keyboard and mouse are the desktop controls minus F5/F9/H/Esc: Space pause /
 // resume (and keep playing after a win), +/- speed, left-drag designate
 // (Ctrl+drag clears), right-click plan or cancel a hut, Tab free-fly camera
 // (WASD move, Q/E down/up, arrows or middle-drag look, wheel dolly, Shift
