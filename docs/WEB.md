@@ -27,10 +27,10 @@ are a separate decision: they must not change or stand in for the desktop save s
 ## Controls
 
 The desktop controls, except F5, F9 and Esc (there is nothing to save or quit) and H (the page lists the
-controls). On a touch screen, use the
-toolbar: **Gather** / **Clear** (drag over tiles), **Hut** (tap a tile to plan a hut or cancel a plan), **Pause**,
-speed **-** / **+**, **Fly** (the free-fly camera; **Look** then turns it by dragging, and an arrow pad moves it)
-and **New colony**. `?seed=N` in the URL picks the seed; without it each visit gets a random one.
+controls). On a touch screen, use the toolbar: **Gather** / **Clear** (drag over tiles), **Hut** (tap a tile to
+plan a hut or cancel a plan), **Pause**, speed **-** / **+**, **Fly** (the free-fly camera; **Look** then turns it
+by dragging, and an arrow pad moves it) and **New colony**. `?seed=N` in the URL picks the seed; without it each
+visit gets a random one.
 
 ## Building
 

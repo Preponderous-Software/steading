@@ -130,9 +130,10 @@ fingerprint.
 
 **Saves are only read, never written:** `--slot` copies the slot's save files to a temporary directory and loads
 the copy through the save core (so not even the slot's lock is taken), runs the colony forward with the rules, and
-saves nothing. A slot saved with mods needs the same `--mods` list, or the load is refused. CI checks the slot's files are byte-identical afterwards and that the history from a save matches a
-fresh run of the same seed tick for tick. The writer is usd-recorder's dependency-free header, vendored in
-`third_party/usd_recorder/`, so the replay needs no OpenUSD; the save format is unchanged.
+saves nothing. A slot saved with mods needs the same `--mods` list, or the load is refused. CI checks the slot's
+files are byte-identical afterwards and that the history from a save matches a fresh run of the same seed tick for
+tick. The writer is usd-recorder's dependency-free header, vendored in `third_party/usd_recorder/`, so the replay
+needs no OpenUSD; the save format is unchanged.
 
 ## Releases
 
