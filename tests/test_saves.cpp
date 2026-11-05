@@ -63,6 +63,14 @@ int main(int argc, char** argv) {
         auto bad = bridge::toWorld(c);
         bad.tables[0].ints[0][0] = 9999;  // a settler off the map
         CHECK(!bridge::fromWorld(bad, back, &why));
+        for (size_t field : {size_t{3}, size_t{4}}) {  // colony:tx, colony:ty
+            bad = bridge::toWorld(c);
+            bad.tables[0].ints[field][0] = 9999;  // a settler headed off the map
+            CHECK(!bridge::fromWorld(bad, back, &why));
+            CHECK_MSG(why == "settler state out of range", why);
+            bad.tables[0].ints[field][0] = -1;
+            CHECK(!bridge::fromWorld(bad, back, &why));
+        }
     }
 
     SECTION("1,000-tick soak: save every 100 ticks, reload, exact, keep playing from the reload");
