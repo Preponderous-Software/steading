@@ -8,7 +8,9 @@
 //  - player orders (designations, hut plans) survive a save;
 //  - mods change stats and looks, a mod mismatch is refused, a forced load
 //    keeps the colony and reverts the stats;
-//  - a damaged latest save falls back to the previous one, loudly.
+//  - a damaged latest save falls back to the previous one, loudly;
+//  - a colony started on a real map (a world package) saves and reloads exactly,
+//    with no need for the package afterwards.
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -18,6 +20,7 @@
 #include "bridge/bridge.h"
 #include "bridge/session.h"
 #include "check.h"
+#include "colony/realmap.h"
 #include "colony/schema.h"
 
 using namespace steading;
@@ -164,6 +167,30 @@ int main(int argc, char** argv) {
         auto l = s->load();
         std::string why;
         CHECK_MSG(l.ok && l.usedFallback && !l.warnings.empty() && equal(s->colony(), first, &why), l.error + why);
+    }
+
+    SECTION("a real-map colony saves and reloads exactly, without its package");
+    {
+        MapPackage pkg;
+        std::string err;
+        CHECK_MSG(readMapPackage(kGame + "/tests/maps/island", pkg, &err), err);
+        GenParams p;
+        p.seed = 9;
+        const Colony made = importMap(pkg, p);
+        const std::string md = freshDir("map");
+        auto s = open(md);
+        CHECK_MSG(s->newGame(made, &err), err);  // newGame itself checks the round trip
+        CHECK(s->colony().grid.w == pkg.w && s->colony().grid.h == pkg.h);
+        for (int t = 0; t < 300; ++t) s->tick();
+        designate(s->colony(), 2, 2, 9, 9, true);
+        CHECK(s->save().ok);
+        const Colony live = s->colony();
+        s.reset();
+        s = open(md);
+        auto l = s->load();
+        std::string why;
+        CHECK_MSG(l.ok && equal(s->colony(), live, &why), l.error + why);
+        CHECK_MSG(!s->newGame(made, &err), "a map game also refuses an occupied slot");
     }
     return check::finish();
 }

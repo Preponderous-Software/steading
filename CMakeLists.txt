@@ -50,9 +50,12 @@ endfunction()
 add_library(steading_colony STATIC
   src/colony/components.cpp
   src/colony/generate.cpp
+  src/colony/realmap.cpp
   src/colony/systems.cpp
   src/colony/view.cpp)
 target_include_directories(steading_colony PUBLIC src)
+# stb_image (PNG only) reads a real map's rasters; private to realmap.cpp.
+target_include_directories(steading_colony SYSTEM PRIVATE third_party)
 steading_warnings(steading_colony)
 # Determinism: the rules must give bit-identical results on every compiler, so
 # never fuse multiply-adds (world generation uses doubles).
@@ -90,7 +93,7 @@ endif()
 if(STEADING_BUILD_TESTS)
   enable_testing()
   set(STEADING_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-  foreach(t generate systems determinism mods replay)
+  foreach(t generate realmap systems determinism mods replay)
     add_executable(test_${t} tests/test_${t}.cpp)
     target_link_libraries(test_${t} PRIVATE steading_colony steading_mods steading_replay)
     target_compile_definitions(test_${t} PRIVATE STEADING_SOURCE_DIR="${STEADING_SOURCE_DIR}")

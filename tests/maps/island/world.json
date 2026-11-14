@@ -1,0 +1,28 @@
+{
+ "grid": {
+  "origin_x": 588,
+  "origin_z": 284,
+  "blocks_per_px": 4,
+  "width": 48,
+  "height": 48,
+  "y_offset": 1024
+ },
+ "classes": [
+  "void",
+  "water",
+  "plain",
+  "forest",
+  "snow",
+  "sand",
+  "stone",
+  "badland",
+  "ice",
+  "lava",
+  "built",
+  "farm"
+ ],
+ "files": {
+  "height": "height.png",
+  "ground": "ground.png"
+ }
+}

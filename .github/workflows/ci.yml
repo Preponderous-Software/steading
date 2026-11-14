@@ -52,6 +52,7 @@ jobs:
           bin=build/steading-sim; [ -f build/Release/steading-sim.exe ] && bin=build/Release/steading-sim.exe
           "$bin" --ticks 1000
           "$bin" --settlers 1000 --max 1000 --size 160 --ticks 300
+          "$bin" --map tests/maps/island --ticks 1000
       - name: History replay (usd-replay/1)
         if: matrix.name == 'gcc-13'
         run: |
@@ -132,6 +133,8 @@ jobs:
         run: |
           build/steading --slot "$RUNNER_TEMP/slot" --new 42 --headless --ticks 400 --screenshot steading-400.png
           build/steading --slot "$RUNNER_TEMP/slot" --headless --ticks 100 --screenshot steading-500.png
+          build/steading --slot "$RUNNER_TEMP/map" --map tests/maps/island --headless --ticks 400 --screenshot steading-map-400.png
+          build/steading --slot "$RUNNER_TEMP/map" --headless --ticks 100 --screenshot steading-map-500.png
 
       - name: History replay from a save is read-only and matches a fresh run
         run: |

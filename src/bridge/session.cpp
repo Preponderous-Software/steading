@@ -109,8 +109,9 @@ std::unique_ptr<Session> Session::open(const Options& opt, std::string* err) {
 
 bool Session::hasGame() const { return strata::save::fs::exists(strata::save::fs::join(opt_.slotDir, "HEAD")); }
 
-bool Session::newGame(const GenParams& p, std::string* err) {
-    Colony c = generate(p);
+bool Session::newGame(const GenParams& p, std::string* err) { return newGame(generate(p), err); }
+
+bool Session::newGame(const Colony& c, std::string* err) {
     if (!slot_->create(bridge::toWorld(c), err)) return false;
     auto r = load();
     if (!r.ok) {

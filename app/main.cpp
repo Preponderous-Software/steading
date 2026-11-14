@@ -1,6 +1,7 @@
 // steading: the playable colony on the Strata engine.
 //
 //   steading [--slot DIR] [--game-dir DIR] [--new SEED] [--size N] [--settlers N] [--mods a,b]
+//            [--map DIR]   (a new colony on a heightmap world package; see docs/WORLD_PACKAGE.md)
 //            [--force-mods] [--headless --ticks N --screenshot out.png]
 //            [--frames DIR --frame-every N --width W --height H --zoom Z]   (headless timelapse frames)
 //            [--fly]   (headless: shoot from the free-fly camera's starting view)
@@ -23,6 +24,7 @@
 #include <vector>
 
 #include "bridge/session.h"
+#include "colony/realmap.h"
 #include "scene.h"
 #include "strata/strata.hpp"
 
@@ -46,6 +48,7 @@ struct Args {
     std::string gameDir = STEADING_GAME_DIR;
     bool fresh = false;
     GenParams gen;
+    std::string map;  // a world package directory: start the new colony on it
     std::vector<std::string> mods;
     bool forceMods = false;
     bool headless = false;
@@ -89,6 +92,7 @@ bool parse(int argc, char** argv, Args& a) {
         else if (k == "--game-dir") a.gameDir = val();
         else if (k == "--new") { a.fresh = true; a.gen.seed = std::strtoull(val().c_str(), nullptr, 10); }
         else if (k == "--size") a.gen.width = a.gen.height = std::atoi(val().c_str());
+        else if (k == "--map") { a.fresh = true; a.map = val(); }
         else if (k == "--settlers") a.gen.settlers = std::atoi(val().c_str());
         else if (k == "--mods") {
             std::stringstream ss(val());
@@ -109,7 +113,7 @@ bool parse(int argc, char** argv, Args& a) {
             std::fprintf(stderr,
                          "unknown argument %s\n"
                          "usage: steading [--slot DIR] [--game-dir DIR] [--new SEED] [--size N] [--settlers N]\n"
-                         "                [--mods a,b] [--force-mods] [--headless --ticks N --screenshot out.png]\n"
+                         "                [--map DIR] [--mods a,b] [--force-mods] [--headless --ticks N --screenshot out.png]\n"
                          "                [--frames DIR --frame-every N --width W --height H --zoom Z] [--fly]\n",
                          k.c_str());
             return false;
@@ -130,11 +134,27 @@ int main(int argc, char** argv) {
         return 1;
     }
     if (a.fresh || !session->hasGame()) {
-        if (!session->newGame(a.gen, &err)) {
+        bool made = false;
+        if (!a.map.empty()) {
+            MapPackage pkg;
+            if (!readMapPackage(a.map, pkg, &err)) {
+                std::fprintf(stderr, "steading: map: %s\n", err.c_str());
+                return 1;
+            }
+            try {
+                made = session->newGame(importMap(pkg, a.gen), &err);
+            } catch (const std::exception& e) {
+                err = e.what();
+            }
+        } else {
+            made = session->newGame(a.gen, &err);
+        }
+        if (!made) {
             std::fprintf(stderr, "steading: new game: %s\n", err.c_str());
             return 1;
         }
-        std::printf("new colony, seed %" PRIu64 ", saved to %s\n", a.gen.seed, a.slot.c_str());
+        std::printf("new colony, seed %" PRIu64 "%s%s, saved to %s\n", a.gen.seed, a.map.empty() ? "" : ", map ",
+                    a.map.c_str(), a.slot.c_str());
     } else {
         strata::save::LoadOptions lo;
         lo.allowModMismatch = a.forceMods;
