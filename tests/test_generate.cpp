@@ -75,11 +75,11 @@ int main() {
             const Grid& g = generate(p).grid;
             const double n = static_cast<double>(g.cells()) * seeds;
             for (size_t i = 0; i < g.cells(); ++i) {
-                water += (g.terrain[i] == 1) / n;
-                rock += (g.terrain[i] == 2) / n;
-                trees += (g.resType[i] == 1) / n;
-                stone += (g.resType[i] == 2) / n;
-                berries += (g.resType[i] == 3) / n;
+                if (g.terrain[i] == 1) water += 1 / n;
+                if (g.terrain[i] == 2) rock += 1 / n;
+                if (g.resType[i] == 1) trees += 1 / n;
+                if (g.resType[i] == 2) stone += 1 / n;
+                if (g.resType[i] == 3) berries += 1 / n;
             }
         }
         std::printf("  water %.3f rock %.3f trees %.3f stone %.3f berries %.4f\n", water, rock, trees, stone, berries);
