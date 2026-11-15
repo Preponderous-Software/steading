@@ -66,8 +66,8 @@ int main(int argc, char** argv) {
 
     // What the game printed when it wrote each fixture (tests/fixtures/README.md).
     const Expect fixtures[] = {
-        {"v1-seed42-tick500", {}, 500, 42, 49, 2, UINT64_C(0x0000000000000000)},
-        {"v1-frost-huts-seed7-tick600", {"frost_huts"}, 600, 7, 26, 3, UINT64_C(0x0000000000000000)},
+        {"v1-seed42-tick500", {}, 500, 42, 49, 2, UINT64_C(0x05ffc670c14bab66)},
+        {"v1-frost-huts-seed7-tick600", {"frost_huts"}, 600, 7, 26, 3, UINT64_C(0x50ec76feccbfd0e2)},
     };
     for (const Expect& x : fixtures) {
         SECTION((std::string(x.name) + ": loads, plays on, saves and reloads exactly").c_str());
