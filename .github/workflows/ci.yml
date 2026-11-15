@@ -62,7 +62,7 @@ jobs:
           "$RUNNER_TEMP/venv/bin/usd-recorder" replay validate replay.usda
           "$RUNNER_TEMP/venv/bin/usd-recorder" replay convert replay.usda steading-seed42.usdc
           # The replay's last state hash is the pinned fingerprint of test_determinism (seed 42, 1000 ticks).
-          grep -q '1000: "011ed2b2f364b21b"' replay.usda
+          grep -q '1000: "09826a6da618223a"' replay.usda
       - name: Upload the replay
         if: matrix.name == 'gcc-13'
         uses: actions/upload-artifact@v4

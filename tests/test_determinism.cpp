@@ -14,6 +14,7 @@
 #include "colony/rng.h"
 #include "colony/schema.h"
 #include "colony/systems.h"
+#include "strata/sim/noise.hpp"
 
 using namespace steading;
 
@@ -206,6 +207,25 @@ int main() {
             }
         CHECK_MSG(unit, "valueNoise stays in [0, 1)");
     }
+    SECTION("strata noise: the vendored copy gives Strata's pinned values");
+    {
+        // World generation draws from Strata's fBm (third_party/strata_noise). These are
+        // the values Strata's own unit test pins (modules/sim/tests/test_sim.cpp at the
+        // vendored commit), so the copy is checked against the original on every compiler.
+        CHECK(strata::sim::latticeHash(0, 0, 0u) == 0x944fb554u);
+        CHECK(strata::sim::latticeHash(-5, 7, 42u) == 0x5818a332u);
+        strata::sim::FbmParams p;
+        p.seed = 1234u;
+        p.octaves = 6;
+        p.gain = 0.6f;
+        const float xs[4] = {0.0f, 0.37f, -12.5f, 100.25f};
+        const float noise[4] = {0.688756227f, 0.254520804f, -0.0458951704f, 0.0907022059f};
+        const float frac[4] = {-0.169958144f, -0.153145447f, -0.296367735f, -0.0396123827f};
+        for (int i = 0; i < 4; ++i) {
+            CHECK(strata::sim::valueNoise(xs[i], xs[i] * 0.5f + 0.3f, 99u) == noise[i]);
+            CHECK(strata::sim::fbm(xs[i], 1.75f - xs[i], p) == frac[i]);
+        }
+    }
     SECTION("pinned fingerprint: seed 42, 64x64, 30 settlers, 1000 ticks");
     {
         // Pins the rules' exact output on every compiler and platform CI runs.
@@ -216,7 +236,7 @@ int main() {
         for (int t = 0; t < 1000; ++t) tick(c, d, Stats{});
         const uint64_t fp = fingerprint(c);
         std::printf("  fingerprint %016" PRIx64 "\n", fp);
-        CHECK_MSG(fp == UINT64_C(0x011ed2b2f364b21b), "rules output changed");
+        CHECK_MSG(fp == UINT64_C(0x09826a6da618223a), "rules output changed");
     }
     return check::finish();
 }

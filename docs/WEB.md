@@ -8,7 +8,7 @@ drawn by Strata's WebGL 2 backend (Strata `docs/WEB.md`).
 
 | | Desktop (`STEADING_WITH_STRATA`) | Browser (`STEADING_WEB`) |
 |---|---|---|
-| Rules (`src/colony`) | the same code | the same code; CI checks the pinned determinism fingerprint `011ed2b2f364b21b` in wasm under Node (ctest) and in Chromium (smoke test) |
+| Rules (`src/colony`) | the same code | the same code; CI checks the pinned determinism fingerprint `09826a6da618223a` in wasm under Node (ctest) and in Chromium (smoke test) |
 | OpenUSD | yes (Strata `modules/usd`, `modules/save`) | **no**: OpenUSD is not built for WebAssembly |
 | Saves | Strata's save core (checksummed, verified, fallback, migrations) | **none**. A colony lasts until the tab is closed or reloaded, and the page says so |
 | Content | `content/prefabs.usda` + mods, composed through USD | core content only: the built-in `Stats` defaults (`src/colony/stats.h`) and `coreLooks()` (`src/colony/looks.h`). `tests/test_core_defaults.cpp` (desktop CI) checks that they equal the USD composition with no mods |
