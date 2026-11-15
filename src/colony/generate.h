@@ -17,4 +17,11 @@ struct GenParams {
 // Same params -> identical Colony (and therefore a byte-identical base layer).
 Colony generate(const GenParams& p);
 
+struct Rng;
+// The second half of generation, shared by generate() and the map importer
+// (realmap.h): on a filled grid, places the stockpile on the clear grass cell
+// nearest the centre, then the settlers around it, and sets the colony-wide
+// state. `rng` continues the stream that filled the grid.
+void settle(Colony& c, const GenParams& p, Rng& rng);
+
 }  // namespace steading

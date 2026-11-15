@@ -61,6 +61,7 @@ steading                                # continue the last save
 steading --mods frost_huts,cheap_huts   # mods in load order (later wins)
 steading --headless --ticks 400 --screenshot out.png
 steading --headless --ticks 1000 --frames out/ --frame-every 8 --zoom 2.6   # timelapse frames
+steading --map tests/maps/island        # a new colony on a real map (docs/WORLD_PACKAGE.md)
 ```
 
 ## Building
@@ -90,6 +91,22 @@ set PATH=C:\path\to\openusd\lib;C:\path\to\openusd\bin;%PATH%
 ctest --test-dir build -C Release
 build\Release\steading.exe --slot %USERPROFILE%\steading-save
 ```
+
+## Real maps
+
+`--map DIR` starts a new colony on a real map: a **heightmap world package** (`world.json` + a 16-bit `height.png` +
+an 8-bit `ground.png` of ground classes; the format is in [docs/WORLD_PACKAGE.md](docs/WORLD_PACKAGE.md)). Water and
+ice become water, stone, snow and lava become rock, forest becomes trees, everything else is open ground; the seed
+scatters the resources and places the settlers. The save keeps the whole grid, so the package is needed only once.
+
+```sh
+steading --map tests/maps/island --new 42
+```
+
+![A colony at tick 600 on a 128 x 128 px synthetic island package: a lake, a stone mountain, forest patches, huts around the stockpile](docs/images/real-map.png)
+
+*A colony on a synthetic island package, tick 600, from the free-fly camera's starting view (rendered headless by the
+game's scene code).*
 
 ## Mods
 

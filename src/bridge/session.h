@@ -25,6 +25,7 @@ public:
 
     bool hasGame() const;                                   // the slot has a HEAD
     bool newGame(const GenParams& p, std::string* err);     // refuses if the slot has a game
+    bool newGame(const Colony& c, std::string* err);        // the same, from a colony made elsewhere (a real map)
     strata::save::LoadResult load(const strata::save::LoadOptions& opt = {});
     strata::save::SaveResult save();                        // synchronous
     std::future<strata::save::SaveResult> saveAsync();      // snapshot here, write on a worker

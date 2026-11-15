@@ -1,6 +1,6 @@
 // steading-sim: run the colony headless and print one JSON line.
 //
-//   steading-sim [--seed N] [--size N] [--settlers N] [--max N] [--ticks N]
+//   steading-sim [--seed N] [--size N] [--settlers N] [--max N] [--ticks N] [--map DIR]
 //
 // Prints the final state summary, the state fingerprint and the tick rate. Used
 // for quick checks and as the rules half of the benchmark.
@@ -9,9 +9,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <string>
 
 #include "colony/generate.h"
+#include "colony/realmap.h"
 #include "colony/systems.h"
 
 using namespace steading;
@@ -19,6 +21,7 @@ using namespace steading;
 int main(int argc, char** argv) {
     GenParams p;
     long ticks = 1000;
+    std::string map;  // a world package directory (docs/WORLD_PACKAGE.md)
     for (int i = 1; i < argc; ++i) {
         auto next = [&](const char* flag) -> long {
             if (i + 1 >= argc) {
@@ -33,12 +36,30 @@ int main(int argc, char** argv) {
         else if (a == "--settlers") p.settlers = static_cast<int32_t>(next("--settlers"));
         else if (a == "--max") p.maxSettlers = static_cast<int32_t>(next("--max"));
         else if (a == "--ticks") ticks = next("--ticks");
+        else if (a == "--map" && i + 1 < argc) map = argv[++i];
         else {
-            std::fprintf(stderr, "usage: steading-sim [--seed N] [--size N] [--settlers N] [--max N] [--ticks N]\n");
+            std::fprintf(stderr, "usage: steading-sim [--seed N] [--size N] [--settlers N] [--max N] [--ticks N] [--map DIR]\n");
             return 2;
         }
     }
-    Colony c = generate(p);
+    Colony c;
+    if (map.empty()) {
+        c = generate(p);
+    } else {
+        MapPackage pkg;
+        std::string err;
+        if (!readMapPackage(map, pkg, &err)) {
+            std::fprintf(stderr, "steading-sim: map: %s\n", err.c_str());
+            return 1;
+        }
+        try {
+            c = importMap(pkg, p);
+        } catch (const std::exception& e) {
+            std::fprintf(stderr, "steading-sim: map: %s\n", e.what());
+            return 1;
+        }
+        p.width = c.grid.w;
+    }
     Derived d = derive(c);
     const Stats s;
     const auto t0 = std::chrono::steady_clock::now();
