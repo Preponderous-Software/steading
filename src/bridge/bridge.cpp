@@ -146,7 +146,8 @@ bool fromWorld(const World& w, Colony& out, std::string* err) {
     c.season = sv->second == "winter" ? Season::Winter : Season::Summer;
     // Range checks the rules rely on.
     for (size_t i = 0; i < c.settlers.size(); ++i)
-        if (!c.grid.inBounds(c.settlers.x[i], c.settlers.y[i]) || c.settlers.task[i] < 0 || c.settlers.task[i] > 3)
+        if (!c.grid.inBounds(c.settlers.x[i], c.settlers.y[i]) ||
+            !c.grid.inBounds(c.settlers.tx[i], c.settlers.ty[i]) || c.settlers.task[i] < 0 || c.settlers.task[i] > 3)
             return setErr(err, "settler state out of range"), false;
     for (size_t i = 0; i < c.buildings.size(); ++i)
         if (!c.grid.inBounds(c.buildings.x[i], c.buildings.y[i])) return setErr(err, "building out of bounds"), false;
