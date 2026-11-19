@@ -13,7 +13,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { chromium, devices } = require('playwright');
 
-const FINGERPRINT = '011ed2b2f364b21b';  // seed 42, 64x64, 30 settlers, 1000 ticks
+const FINGERPRINT = '09826a6da618223a';  // seed 42, 64x64, 30 settlers, 1000 ticks
 const [url, outDir] = process.argv.slice(2);
 const phone = process.argv.includes('--phone');
 if (!url || !outDir) {

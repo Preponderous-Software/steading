@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <set>
 #include <stdexcept>
 
@@ -57,6 +58,36 @@ int main() {
         }
         CHECK(c.globals.maxSettlers == 50 && c.globals.food == 20 && c.season == Season::Summer);
         CHECK(c.globals.seed == 42);
+    }
+    SECTION("the land's shares stay where the two-octave generator had them");
+    {
+        // World generation moved to fractal noise (generate.cpp). The thresholds were
+        // chosen so that, over many seeds, the shares of water, rock and resources stay
+        // what the earlier generator gave (seeds 1-256, 64 x 64: water 11.1%, rock 9.5%,
+        // trees 15.3%, stone 2.8%, berries 1.1%), so a colony's food, wood and stone do not
+        // move. Averaged over 64 seeds here, with a margin.
+        double water = 0, rock = 0, trees = 0, stone = 0, berries = 0;
+        const int seeds = 64;
+        for (int s = 1; s <= seeds; ++s) {
+            GenParams p;
+            p.seed = static_cast<uint64_t>(s);
+            p.settlers = 0;
+            const Grid& g = generate(p).grid;
+            const double n = static_cast<double>(g.cells()) * seeds;
+            for (size_t i = 0; i < g.cells(); ++i) {
+                if (g.terrain[i] == 1) water += 1 / n;
+                if (g.terrain[i] == 2) rock += 1 / n;
+                if (g.resType[i] == 1) trees += 1 / n;
+                if (g.resType[i] == 2) stone += 1 / n;
+                if (g.resType[i] == 3) berries += 1 / n;
+            }
+        }
+        std::printf("  water %.3f rock %.3f trees %.3f stone %.3f berries %.4f\n", water, rock, trees, stone, berries);
+        CHECK(water > 0.09 && water < 0.135);
+        CHECK(rock > 0.075 && rock < 0.115);
+        CHECK(trees > 0.135 && trees < 0.17);
+        CHECK(stone > 0.02 && stone < 0.035);
+        CHECK(berries > 0.009 && berries < 0.0135);
     }
     SECTION("bad parameters are rejected");
     {

@@ -53,7 +53,7 @@ jobs:
           ctest --test-dir build-web --output-on-failure
           # The pinned fingerprint of tests/test_determinism.cpp, printed by the wasm build.
           node build-web/test_determinism.js | tee determinism.txt
-          grep -q 'fingerprint 011ed2b2f364b21b' determinism.txt
+          grep -q 'fingerprint 09826a6da618223a' determinism.txt
 
       - name: Assemble the site
         run: |

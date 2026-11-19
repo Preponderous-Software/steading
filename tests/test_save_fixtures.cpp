@@ -5,6 +5,7 @@
 // slot's lock), checked against what was recorded when it was written, played
 // on, saved and reloaded exactly. The seed-42 slot also keeps its previous
 // save, which must take over when the latest save is damaged.
+#include <cinttypes>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -53,6 +54,7 @@ struct Expect {
     uint64_t seed;
     size_t settlers;
     int64_t winters;
+    uint64_t loaded;  // fingerprint() of the colony as loaded, pinned once and never re-pinned
 };
 
 }  // namespace
@@ -64,8 +66,8 @@ int main(int argc, char** argv) {
 
     // What the game printed when it wrote each fixture (tests/fixtures/README.md).
     const Expect fixtures[] = {
-        {"v1-seed42-tick500", {}, 500, 42, 49, 2},
-        {"v1-frost-huts-seed7-tick600", {"frost_huts"}, 600, 7, 26, 3},
+        {"v1-seed42-tick500", {}, 500, 42, 49, 2, UINT64_C(0x05ffc670c14bab66)},
+        {"v1-frost-huts-seed7-tick600", {"frost_huts"}, 600, 7, 26, 3, UINT64_C(0x50ec76feccbfd0e2)},
     };
     for (const Expect& x : fixtures) {
         SECTION((std::string(x.name) + ": loads, plays on, saves and reloads exactly").c_str());
@@ -85,6 +87,11 @@ int main(int argc, char** argv) {
         CHECK(c.globals.seed == static_cast<int64_t>(x.seed));
         CHECK_MSG(c.settlers.size() == x.settlers, std::to_string(c.settlers.size()) + " settlers");
         CHECK(wintersSurvived(c) == x.winters);
+        // The whole world (map included) comes from the save, never from the seed: a
+        // change to world generation must leave every saved colony exactly as saved.
+        // The pins were recorded before world generation moved to fractal noise.
+        std::printf("  loaded fingerprint %016" PRIx64 "\n", fingerprint(c));
+        CHECK_MSG(fingerprint(c) == x.loaded, std::string(x.name) + ": the colony as loaded changed");
         for (int t = 0; t < 100; ++t) s->tick();
         const Colony live = s->colony();
         auto r = s->save();

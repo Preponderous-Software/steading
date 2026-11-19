@@ -8,7 +8,7 @@ third-party notices at that commit.
 
 | Component | Licence | How it is used |
 |---|---|---|
-| Strata | MIT | The engine, linked statically. Its own components are listed below. |
+| Strata | MIT | The engine, linked statically. Its own components are listed below. Its value noise and fBm (`noise.hpp`, `noise.cpp`) are also vendored in `third_party/strata_noise` from a later Strata commit (that directory's README says which), under the same licence. |
 | [OpenUSD](https://github.com/PixarAnimationStudios/OpenUSD) v26.08 | Tomorrow Open Source Technology License 1.0 (Apache-2.0 based) | The world, save and mod format. Strata's prebuilt (`openusd-v26.08-*`), shipped as shared libraries and plugins in `lib/` (and `bin/` on Windows). The full licence is `licenses/OpenUSD-LICENSE.txt` in the download. |
 | [oneTBB](https://github.com/uxlfoundation/oneTBB) | Apache-2.0 | OpenUSD's threading library, shipped beside it. The full licence is `licenses/oneTBB-LICENSE.txt` in the download. |
 | Microsoft Visual C++ runtime (Windows only) | Microsoft Visual C++ redistributable terms | `msvcp140*.dll`, `vcruntime140*.dll` and friends, copied app-locally from Visual Studio's redistributable folder, because OpenUSD is built against the dynamic C++ runtime. |

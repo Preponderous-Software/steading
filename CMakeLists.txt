@@ -52,10 +52,14 @@ add_library(steading_colony STATIC
   src/colony/generate.cpp
   src/colony/realmap.cpp
   src/colony/systems.cpp
-  src/colony/view.cpp)
+  src/colony/view.cpp
+  third_party/strata_noise/src/noise.cpp)
 target_include_directories(steading_colony PUBLIC src)
 # stb_image (PNG only) reads a real map's rasters; private to realmap.cpp.
 target_include_directories(steading_colony SYSTEM PRIVATE third_party)
+# Strata's value noise and fBm (strata/sim/noise.hpp), vendored unchanged so the
+# rules stay engine-free; third_party/strata_noise/README.md says from where.
+target_include_directories(steading_colony PUBLIC third_party/strata_noise/include)
 steading_warnings(steading_colony)
 # Determinism: the rules must give bit-identical results on every compiler, so
 # never fuse multiply-adds (world generation uses doubles).
