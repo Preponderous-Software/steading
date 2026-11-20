@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <utility>
 
 #include "bridge/bridge.h"
 #include "bridge/session.h"
@@ -74,6 +75,43 @@ int main(int argc, char** argv) {
             CHECK_MSG(why == "settler state out of range", why);
             bad.tables[0].ints[field][0] = -1;
             CHECK(!bridge::fromWorld(bad, back, &why));
+        }
+        // Id counters must stay ahead of the ids, or the first birth or hut throws.
+        CHECK(c.settlers.size() > 0 && c.buildings.size() > 0);
+        const std::pair<const char*, int64_t> lagging[] = {
+            {"colony:nextSettler", c.settlers.id.back()},      // equal to the last settler id
+            {"colony:nextSettler", c.settlers.id.back() - 1},  // behind it
+            {"colony:nextBuilding", c.buildings.id.back()},
+            {"colony:nextBuilding", -1},
+        };
+        for (const auto& [key, value] : lagging) {
+            bad = bridge::toWorld(c);
+            bad.globals[key] = value;
+            why.clear();
+            CHECK(!bridge::fromWorld(bad, back, &why));
+            CHECK_MSG(why == "id counter behind ids", why);
+        }
+        {  // with no settlers left, a negative counter would still hand out a negative id
+            Colony empty = c;
+            while (empty.settlers.size() > 0) empty.settlers.remove(empty.settlers.size() - 1);
+            CHECK_MSG(bridge::fromWorld(bridge::toWorld(empty), back, &why), why);
+            bad = bridge::toWorld(empty);
+            bad.globals["colony:nextSettler"] = -5;
+            why.clear();
+            CHECK(!bridge::fromWorld(bad, back, &why));
+            CHECK_MSG(why == "id counter behind ids", why);
+        }
+        // The stockpile is checked at its full 64 bits: off the map, and off the map by
+        // exactly 2^32 (which a 32-bit cast would wrap back onto the map).
+        for (const char* key : {"colony:stockX", "colony:stockY"}) {
+            const int64_t onMap = std::string(key) == "colony:stockX" ? c.globals.stockX : c.globals.stockY;
+            for (int64_t value : {int64_t{9999}, onMap + (int64_t{1} << 32), onMap - (int64_t{1} << 32)}) {
+                bad = bridge::toWorld(c);
+                bad.globals[key] = value;
+                why.clear();
+                CHECK(!bridge::fromWorld(bad, back, &why));
+                CHECK_MSG(why == "stockpile out of bounds", why);
+            }
         }
     }
 
