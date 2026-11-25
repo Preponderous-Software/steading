@@ -151,8 +151,15 @@ bool fromWorld(const World& w, Colony& out, std::string* err) {
             return setErr(err, "settler state out of range"), false;
     for (size_t i = 0; i < c.buildings.size(); ++i)
         if (!c.grid.inBounds(c.buildings.x[i], c.buildings.y[i])) return setErr(err, "building out of bounds"), false;
-    if (!c.grid.inBounds(static_cast<int32_t>(c.globals.stockX), static_cast<int32_t>(c.globals.stockY)))
+    if (!fits(c.globals.stockX) || !fits(c.globals.stockY) ||
+        !c.grid.inBounds(static_cast<int32_t>(c.globals.stockX), static_cast<int32_t>(c.globals.stockY)))
         return setErr(err, "stockpile out of bounds"), false;
+    // Settlers::add and Buildings::add throw unless each new id exceeds the last one.
+    auto ahead = [](int64_t next, const std::vector<int64_t>& ids) {
+        return next >= 0 && (ids.empty() || next > ids.back());
+    };
+    if (!ahead(c.globals.nextSettlerId, c.settlers.id) || !ahead(c.globals.nextBuildingId, c.buildings.id))
+        return setErr(err, "id counter behind ids"), false;
     out = std::move(c);
     return true;
 }
